@@ -1,6 +1,6 @@
 ---
 description: Defines personalized development preferences and communication style for Flow blockchain development including concise response formatting, documentation-driven problem solving, iterative workflow methodology, full-stack awareness, and systematic error resolution. Guides AI behavior to match user's preferred development philosophy with emphasis on official Flow patterns, practical solutions, and proactive error prevention across the entire development stack.
-alwaysApply: false
+alwaysApply: true
 ---
 # User Development Preferences
 
