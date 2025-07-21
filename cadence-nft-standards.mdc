@@ -1,0 +1,588 @@
+---
+description: Comprehensive standards and best practices for developing Non-Fungible Tokens (NFTs) using Cadence. Ensures proper implementation of NonFungibleToken interfaces, MetadataViews integration for marketplace compatibility, secure resource handling patterns, and advanced modular architectures for complex NFTs with traits, evolution, and breeding mechanics. Includes required standard functions, path conventions, event emission patterns, and security best practices for capability management.
+alwaysApply: false
+---
+# Cadence NFT Development Standards
+
+## Core Interface Conformance
+- **Contract Level**: Main NFT contract MUST implement `NonFungibleToken` interface
+  ```cadence
+  access(all) contract MyNFT: NonFungibleToken {
+  ```
+
+- **NFT Resource**: NFT resource MUST implement `NonFungibleToken.NFT` interface
+  ```cadence
+  access(all) resource NFT: NonFungibleToken.NFT {
+  ```
+
+- **Collection Resource**: Collection MUST implement `NonFungibleToken.Collection`
+  ```cadence
+  access(all) resource Collection: NonFungibleToken.Collection {
+  ```
+
+## Required Standard Functions
+### Contract Level
+- `createEmptyCollection(): @{NonFungibleToken.Collection}`
+- `getContractViews(resourceType: Type?): [Type]`
+- `resolveContractView(resourceType: Type?, viewType: Type): AnyStruct?`
+
+### NFT Resource
+- `getViews(): [Type]` - Return supported MetadataViews
+- `resolveView(_ view: Type): AnyStruct?` - Resolve specific metadata views
+
+### Collection Resource
+- `deposit(token: @{NonFungibleToken.NFT})`
+- `withdraw(withdrawID: UInt64): @{NonFungibleToken.NFT}` with proper entitlements
+- `getIDs(): [UInt64]`
+- `borrowNFT(_ id: UInt64): &{NonFungibleToken.NFT}?`
+- `getSupportedNFTTypes(): {Type: Bool}`
+- `isSupportedNFTType(type: Type): Bool`
+
+## MetadataViews Integration
+Always implement MetadataViews for marketplace compatibility:
+
+### Essential Views
+- `MetadataViews.Display` - Name, description, thumbnail
+- `MetadataViews.Serial` - Unique identifier
+- `MetadataViews.NFTCollectionData` - Collection metadata
+- `MetadataViews.NFTCollectionDisplay` - Collection display info
+
+### Advanced Views (when applicable)
+- `MetadataViews.Editions` - For limited editions
+- `MetadataViews.Traits` - For attribute-based NFTs
+- `MetadataViews.Royalties` - For creator royalties
+
+## Standard Path Conventions
+```cadence
+access(all) let CollectionStoragePath: StoragePath
+access(all) let CollectionPublicPath: PublicPath
+// Use versioned paths: /storage/MyNFTCollectionV1
+```
+- Ensure these paths are consistently defined and initialized in your contract's `init()` function.
+- Verify transaction scripts use the correct path variables as defined in the contract.
+
+## Resource Type Declarations
+- **Storage Dictionary**: `@{UInt64: {NonFungibleToken.NFT}}`
+- **Function Parameters**: `token: @{NonFungibleToken.NFT}`
+- **References**: `&{NonFungibleToken.NFT}?`
+
+## File Structure Requirements
+- Each `.cdc` file MUST contain exactly ONE top-level contract declaration
+- Supporting structs, resources, and interfaces must be nested within the contract scope
+- Avoid multiple top-level declarations that cause "exactly one contract" errors
+
+## Modular NFT Design for Complex Traits & Behaviors
+For NFTs with dynamic traits, evolution, or complex behaviors (e.g., breeding, interactive states), a modular architecture is highly recommended.
+
+### Core NFT Contract (`EvolvingCreatureNFT.cdc` example)
+- **Responsibilities**: Manages core NFT lifecycle (minting, ownership, unique ID), basic metadata, and coordinates trait modules. Stores global NFT state like `edadDiasCompletos`, `lastInteractionTimestamp`.
+- **Trait Registry**: Maintains a registry of `TraitModule` contracts.
+  ```cadence
+  access(self) var registeredModules: {String: Address} // moduleType -> contract address
+  access(self) var moduleContracts: {String: String}    // moduleType -> contract name
+  access(self) var moduleOrder: [String] // Defines evolution/processing order if important
+  
+  access(all) fun registerModule(moduleType: String, contractAddress: Address, contractName: String, order: Int?) { /* ... adds to registry and order array ... */ }
+  access(all) view fun getModuleFactory(moduleType: String): &{TraitModule}? { /* ... */ }
+  ```
+- **NFT Resource (`NFT`)**: Holds a dictionary of active trait resources.
+  ```cadence
+  access(all) var traits: @{String: {TraitModule.Trait}}
+  access(all) var nftUUID: UInt64 // From NonFungibleToken.NFT
+  access(all) var edition: UInt32 // Example global state
+  access(all) var generation: UInt32 // Example global state for breeding
+  access(self) var lastEvolutionTimestamp: UFix64
+  access(self) var accumulatedEP: UFix64 // Evolution Points
+  ```
+- **Lazy Initialization of Traits**: Trait resources can be initialized on-demand when first accessed or needed, rather than all at minting. This saves gas and allows for more dynamic trait addition.
+  ```cadence
+  // In NFT resource
+  access(all) fun ensureTraitExists(traitType: String): Bool {
+      if self.traits.containsKey(traitType) { return true }
+      // Attempt to get the module factory from the main NFT contract
+      if let factory = EvolvingCreatureNFT.getModuleFactory(moduleType: traitType) {
+          // Optionally, pass a seed or context if the module requires it for default trait creation
+          let defaultTrait <- factory.createDefaultTrait(nftUUID: self.uuid) 
+          let oldTrait <- self.traits.insert(key: traitType, <-defaultTrait)
+          destroy oldTrait // Destroy if replacing, though ensureTraitExists implies it wasn't there
+          return true
+      }
+      return false
+  }
+  ```
+- **Coordination of Behaviors by Core NFT**:
+    - **Evolution (`evolve()` in NFT resource)**: 
+        - Calculates elapsed time/steps since last evolution.
+        - Generates daily/step-based seeds (e.g., using `self.lastEvolutionTimestamp`, `self.uuid`, `EvolvingCreatureNFT.edadDiasCompletos`).
+        - Iterates through registered modules (respecting `moduleOrder` if defined).
+        - Calls each module's `evolveAccumulative()` method, passing relevant seeds and step count.
+        - Updates global NFT state (`lastEvolutionTimestamp`, `accumulatedEP`, `EvolvingCreatureNFT.edadDiasCompletos`).
+        - Handles cross-module influences if any, after individual module evolutions.
+    - **Reproduction**: The core NFT contract can host `reproduceSexual()` and `reproduceAsexual()` functions that take parent NFTs, generate seeds, and then iterate through trait modules, calling their respective `createChildTrait()` or `createMitosisChild()` methods to assemble the new offspring's traits.
+
+### Trait Module Interface (`TraitModule.cdc` example)
+- **Defines a standard interface** for all trait modules.
+- **`Trait` Resource Interface**: Each module's trait resource must implement this.
+  ```cadence
+  access(all) resource interface Trait {
+      access(all) view fun getRawValue(): AnyStruct // Return the specific struct/value of the trait
+      access(all) view fun getValueAsString(): String // For display or simple use
+      access(all) fun updateValue(newValue: AnyStruct) // For direct updates if allowed
+      access(all) view fun getDisplayName(): String
+      // evolveAccumulative is key for efficiency
+      access(all) fun evolveAccumulative(seeds: {String: UInt64}, steps: UInt64, nftOwner: Address?, nftUUID: UInt64): AnyStruct? // Returns potential new state or status
+      access(all) view fun canEvolve(): Bool // Optional: if a trait has maxed out or conditions met
+  }
+  ```
+- **Factory Functions in Module Contract**:
+  ```cadence
+  // In each TraitModule contract (e.g., VisualTraitsModule.cdc)
+  access(all) fun createDefaultTrait(nftUUID: UInt64): @{TraitModule.Trait} // Can use nftUUID for deterministic default seed
+  access(all) fun createTraitWithSeed(seed: UInt64, nftUUID: UInt64): @{TraitModule.Trait}
+  // For reproduction, these take the *specific parent trait resource* of this module type
+  access(all) fun createChildTrait(parent1Trait: &{TraitModule.Trait}, parent2Trait: &{TraitModule.Trait}, seed: UInt64, nftUUID: UInt64): @{TraitModule.Trait}
+  access(all) fun createMitosisChild(parentTrait: &{TraitModule.Trait}, seed: UInt64, nftUUID: UInt64): @{TraitModule.Trait}
+  ```
+
+### Individual Trait Modules (`VisualTraitsModule.cdc`, `StatsModule.cdc`, etc.)
+- **Specialized Logic**: Each module implements the `TraitModule` interface and contains the specific logic for its domain.
+- **Owns its Trait Resource**: Defines the concrete `Trait` resource (e.g., `VisualData`, `StatValues`) that implements `TraitModule.Trait`.
+- **Genetic Inheritance**: Implements `createChildTrait()` and `createMitosisChild()` to define how its specific traits are inherited and mutated.
+- **Evolution Logic**: Implements `evolveAccumulative()` to define how its traits change over time. This function should be designed to calculate the *total effect* of `steps` efficiently without iterating if possible, or by iterating internally with step-specific seed generation based on the input `seeds`.
+
+## Advanced Genetic Systems for NFTs (e.g., `ReproductionModuleV2.cdc`)
+- **Genetic Markers**: Represent unique genetic sequences (e.g., an array of `UFix64` values, or a struct with named genes).
+- **Dominance/Recessive Logic**: Can be implemented within `createChildTrait` if traits follow such patterns.
+- **Fertility & Maturity**: Can be specific traits within a module or global NFT state affecting reproduction calls.
+- **Mutations**: Introduce rare mutations algorithmically within `createChildTrait` or `createMitosisChild` based on a seed.
+- **Heritability Rules**: Each trait module defines its own rules: averaging, blending, discrete selection, etc.
+
+## Benefits of Modular Design for Complex NFTs:
+- **Scalability**: Easier to add new traits or behaviors by creating new modules.
+- **Maintainability**: Code is organized and easier to debug/update.
+- **Flexibility**: Different NFTs can use different combinations of modules.
+- **Testability**: Individual modules can be tested in isolation.
+- **Gas Efficiency**: Lazy initialization and optimized `evolveAccumulative` help manage computation.
+
+## Immutable Field Workarounds in Deployed Contracts
+- **Problem**: `init()` functions in deployed contracts are immutable. If you add a new field to a resource/struct, existing instances won't have it initialized via `init()`.
+- **Solution 1 (Lazy Initialization / Defaulting in Accessors)**: When a function accesses the new field, check if it's in a default/uninitialized state (e.g., `nil` for optionals, `0.0` for `UFix64` if that's distinguishable) and initialize it then.
+  ```cadence
+  access(all) resource MyResource {
+      access(all) var existingField: String
+      access(all) var newField: UFix64? // Added after deployment
+
+      init(existing: String) {
+          self.existingField = existing
+          // newField was not in the original init()
+          self.newField = nil 
+      }
+
+      access(all) view fun getNewFieldValue(): UFix64 {
+          if self.newField == nil {
+              // self.newField = 10.0 // Cannot directly assign in a view function
+              // This pattern is better for functions that can mutate:
+              // if self.newField == nil { self.newField = computeDefault() }
+              // For view functions, return a default or signal it needs initialization.
+              return 0.0 // Default or indicate it needs setting
+          }
+          return self.newField!
+      }
+      access(all) fun ensureNewFieldInitialized() {
+          if self.newField == nil {
+              self.newField = 10.0 // Default value
+          }
+      }
+  }
+  ```
+- **Solution 2 (Explicit Update Function)**: Add a new public function to the contract/resource that users or an admin can call to initialize the new field for existing instances.
+- **Consider for New Designs**: Make fields optional if they might be added later, or provide setter functions.
+
+## Secure Capability Management
+- **Statement**: Restrict capability exposure. Store `PrivatePath` capabilities internally. For external access, link `PublicPath` capabilities with restrictive interfaces exposing only necessary functionality.
+- **Example**:
+  ```cadence
+  // In your contract
+  access(all) contract MyAsset {
+      // ... (other definitions) ...
+
+      // Admin Capability (Private)
+      access(all) resource Admin {
+          access(all) fun createNewThing(): @NonFungibleToken.NFT {
+              // ... logic to create something ...
+              return <- create NonFungibleToken.NFT(/* ... */)
+          }
+      }
+
+      // Public Minter Interface (more restrictive)
+      access(all) resource interface PublicMinter {
+          access(all) fun mintNFT(): @NonFungibleToken.NFT
+      }
+
+      // Resource implementing the public interface
+      access(all) resource Minter: PublicMinter {
+          access(all) fun mintNFT(): @NonFungibleToken.NFT {
+              // Secure logic to mint an NFT
+              log("Public Minter minting NFT")
+              return <- create NonFungibleToken.NFT(/* ... */)
+          }
+      }
+
+      init() {
+          // ...
+          // Create and securely store the Admin capability
+          self.account.storage.save(<- create Admin(), to: /storage/myAssetAdmin)
+
+          // Create the public Minter and save it, then link a public capability
+          self.account.storage.save(<- create Minter(), to: /storage/myAssetPublicMinter)
+          self.account.capabilities.publish(
+              self.account.capabilities.storage.issue<&Minter{PublicMinter}>(/storage/myAssetPublicMinter),
+              at: /public/myAssetPublicMinter
+          )
+          // ...
+      }
+  }
+  ```
+- **Why**: Minimizes attack surface and ensures interactions occur through well-defined entry points with least privilege.
+
+## Explicit Resource Handling
+- **Statement**: Every resource (`@`) must have a clear destination: moved to a new location (variable, storage, return parameter) or explicitly destroyed using `destroy`. Prevent resources from becoming orphaned or inaccessible.
+- **Example**:
+  ```cadence
+  access(all) resource MyResource {
+      access(all) let id: UInt64
+      init(id: UInt64) {
+          self.id = id
+      }
+  }
+
+  access(all) fun processResource(r: @MyResource) {
+      log(r.id)
+      // Resource 'r' must be handled here
+      // Option 1: Move it elsewhere (if function allows or returns it)
+      // Option 2: Destroy it if no longer needed
+      destroy r
+  }
+
+  access(all) fun createAndStore() {
+      let newRes <- create MyResource(id: 1)
+      // Move to storage
+      self.account.storage.save(<-newRes, to: /storage/myResourceExample)
+
+      // Retrieve and process
+      let storedRes <- self.account.storage.load<@MyResource>(from: /storage/myResourceExample)
+                          ?? panic("Resource not found")
+      processResource(r: <-storedRes) // 'processResource' takes ownership of 'storedRes'
+  }
+  ```
+- **Why**: Resources are unique and linear. Incorrect handling can lead to their loss or inconsistent contract states.
+
+## Standardized Event Emission
+- **Statement**: Define a consistent format for events, including the contract name as a prefix (e.g., `MyContract.EventName`) and key identifiers (e.g., `nftID`, `itemID`, `recipient`). Emit events for all significant actions.
+- **Example**:
+  ```cadence
+  access(all) contract MyAwesomeNFT {
+      access(all) event MyAwesomeNFT.Minted(nftID: UInt64, recipient: Address)
+      access(all) event MyAwesomeNFT.Transferred(nftID: UInt64, from: Address, to: Address)
+
+      // ... (inside a minting function)
+      // emit MyAwesomeNFT.Minted(nftID: newNFT.id, recipient: recipient.address)
+
+      // ... (inside a transfer function)
+      // emit MyAwesomeNFT.Transferred(nftID: nft.id, from: oldOwner.address, to: newOwner.address)
+      init() { /* ... */ }
+  }
+  ```
+- **Why**: Facilitates off-chain indexing and monitoring by dApps and services.
+# Cadence NFT Development Standards
+
+## Core Interface Conformance
+- **Contract Level**: Main NFT contract MUST implement `NonFungibleToken` interface
+  ```cadence
+  access(all) contract MyNFT: NonFungibleToken {
+  ```
+
+- **NFT Resource**: NFT resource MUST implement `NonFungibleToken.NFT` interface
+  ```cadence
+  access(all) resource NFT: NonFungibleToken.NFT {
+  ```
+
+- **Collection Resource**: Collection MUST implement `NonFungibleToken.Collection`
+  ```cadence
+  access(all) resource Collection: NonFungibleToken.Collection {
+  ```
+
+## Required Standard Functions
+### Contract Level
+- `createEmptyCollection(): @{NonFungibleToken.Collection}`
+- `getContractViews(resourceType: Type?): [Type]`
+- `resolveContractView(resourceType: Type?, viewType: Type): AnyStruct?`
+
+### NFT Resource
+- `getViews(): [Type]` - Return supported MetadataViews
+- `resolveView(_ view: Type): AnyStruct?` - Resolve specific metadata views
+
+### Collection Resource
+- `deposit(token: @{NonFungibleToken.NFT})`
+- `withdraw(withdrawID: UInt64): @{NonFungibleToken.NFT}` with proper entitlements
+- `getIDs(): [UInt64]`
+- `borrowNFT(_ id: UInt64): &{NonFungibleToken.NFT}?`
+- `getSupportedNFTTypes(): {Type: Bool}`
+- `isSupportedNFTType(type: Type): Bool`
+
+## MetadataViews Integration
+Always implement MetadataViews for marketplace compatibility:
+
+### Essential Views
+- `MetadataViews.Display` - Name, description, thumbnail
+- `MetadataViews.Serial` - Unique identifier
+- `MetadataViews.NFTCollectionData` - Collection metadata
+- `MetadataViews.NFTCollectionDisplay` - Collection display info
+
+### Advanced Views (when applicable)
+- `MetadataViews.Editions` - For limited editions
+- `MetadataViews.Traits` - For attribute-based NFTs
+- `MetadataViews.Royalties` - For creator royalties
+
+## Standard Path Conventions
+```cadence
+access(all) let CollectionStoragePath: StoragePath
+access(all) let CollectionPublicPath: PublicPath
+// Use versioned paths: /storage/MyNFTCollectionV1
+```
+- Ensure these paths are consistently defined and initialized in your contract's `init()` function.
+- Verify transaction scripts use the correct path variables as defined in the contract.
+
+## Resource Type Declarations
+- **Storage Dictionary**: `@{UInt64: {NonFungibleToken.NFT}}`
+- **Function Parameters**: `token: @{NonFungibleToken.NFT}`
+- **References**: `&{NonFungibleToken.NFT}?`
+
+## File Structure Requirements
+- Each `.cdc` file MUST contain exactly ONE top-level contract declaration
+- Supporting structs, resources, and interfaces must be nested within the contract scope
+- Avoid multiple top-level declarations that cause "exactly one contract" errors
+
+## Modular NFT Design for Complex Traits & Behaviors
+For NFTs with dynamic traits, evolution, or complex behaviors (e.g., breeding, interactive states), a modular architecture is highly recommended.
+
+### Core NFT Contract (`EvolvingCreatureNFT.cdc` example)
+- **Responsibilities**: Manages core NFT lifecycle (minting, ownership, unique ID), basic metadata, and coordinates trait modules. Stores global NFT state like `edadDiasCompletos`, `lastInteractionTimestamp`.
+- **Trait Registry**: Maintains a registry of `TraitModule` contracts.
+  ```cadence
+  access(self) var registeredModules: {String: Address} // moduleType -> contract address
+  access(self) var moduleContracts: {String: String}    // moduleType -> contract name
+  access(self) var moduleOrder: [String] // Defines evolution/processing order if important
+  
+  access(all) fun registerModule(moduleType: String, contractAddress: Address, contractName: String, order: Int?) { /* ... adds to registry and order array ... */ }
+  access(all) view fun getModuleFactory(moduleType: String): &{TraitModule}? { /* ... */ }
+  ```
+- **NFT Resource (`NFT`)**: Holds a dictionary of active trait resources.
+  ```cadence
+  access(all) var traits: @{String: {TraitModule.Trait}}
+  access(all) var nftUUID: UInt64 // From NonFungibleToken.NFT
+  access(all) var edition: UInt32 // Example global state
+  access(all) var generation: UInt32 // Example global state for breeding
+  access(self) var lastEvolutionTimestamp: UFix64
+  access(self) var accumulatedEP: UFix64 // Evolution Points
+  ```
+- **Lazy Initialization of Traits**: Trait resources can be initialized on-demand when first accessed or needed, rather than all at minting. This saves gas and allows for more dynamic trait addition.
+  ```cadence
+  // In NFT resource
+  access(all) fun ensureTraitExists(traitType: String): Bool {
+      if self.traits.containsKey(traitType) { return true }
+      // Attempt to get the module factory from the main NFT contract
+      if let factory = EvolvingCreatureNFT.getModuleFactory(moduleType: traitType) {
+          // Optionally, pass a seed or context if the module requires it for default trait creation
+          let defaultTrait <- factory.createDefaultTrait(nftUUID: self.uuid) 
+          let oldTrait <- self.traits.insert(key: traitType, <-defaultTrait)
+          destroy oldTrait // Destroy if replacing, though ensureTraitExists implies it wasn't there
+          return true
+      }
+      return false
+  }
+  ```
+- **Coordination of Behaviors by Core NFT**:
+    - **Evolution (`evolve()` in NFT resource)**: 
+        - Calculates elapsed time/steps since last evolution.
+        - Generates daily/step-based seeds (e.g., using `self.lastEvolutionTimestamp`, `self.uuid`, `EvolvingCreatureNFT.edadDiasCompletos`).
+        - Iterates through registered modules (respecting `moduleOrder` if defined).
+        - Calls each module's `evolveAccumulative()` method, passing relevant seeds and step count.
+        - Updates global NFT state (`lastEvolutionTimestamp`, `accumulatedEP`, `EvolvingCreatureNFT.edadDiasCompletos`).
+        - Handles cross-module influences if any, after individual module evolutions.
+    - **Reproduction**: The core NFT contract can host `reproduceSexual()` and `reproduceAsexual()` functions that take parent NFTs, generate seeds, and then iterate through trait modules, calling their respective `createChildTrait()` or `createMitosisChild()` methods to assemble the new offspring's traits.
+
+### Trait Module Interface (`TraitModule.cdc` example)
+- **Defines a standard interface** for all trait modules.
+- **`Trait` Resource Interface**: Each module's trait resource must implement this.
+  ```cadence
+  access(all) resource interface Trait {
+      access(all) view fun getRawValue(): AnyStruct // Return the specific struct/value of the trait
+      access(all) view fun getValueAsString(): String // For display or simple use
+      access(all) fun updateValue(newValue: AnyStruct) // For direct updates if allowed
+      access(all) view fun getDisplayName(): String
+      // evolveAccumulative is key for efficiency
+      access(all) fun evolveAccumulative(seeds: {String: UInt64}, steps: UInt64, nftOwner: Address?, nftUUID: UInt64): AnyStruct? // Returns potential new state or status
+      access(all) view fun canEvolve(): Bool // Optional: if a trait has maxed out or conditions met
+  }
+  ```
+- **Factory Functions in Module Contract**:
+  ```cadence
+  // In each TraitModule contract (e.g., VisualTraitsModule.cdc)
+  access(all) fun createDefaultTrait(nftUUID: UInt64): @{TraitModule.Trait} // Can use nftUUID for deterministic default seed
+  access(all) fun createTraitWithSeed(seed: UInt64, nftUUID: UInt64): @{TraitModule.Trait}
+  // For reproduction, these take the *specific parent trait resource* of this module type
+  access(all) fun createChildTrait(parent1Trait: &{TraitModule.Trait}, parent2Trait: &{TraitModule.Trait}, seed: UInt64, nftUUID: UInt64): @{TraitModule.Trait}
+  access(all) fun createMitosisChild(parentTrait: &{TraitModule.Trait}, seed: UInt64, nftUUID: UInt64): @{TraitModule.Trait}
+  ```
+
+### Individual Trait Modules (`VisualTraitsModule.cdc`, `StatsModule.cdc`, etc.)
+- **Specialized Logic**: Each module implements the `TraitModule` interface and contains the specific logic for its domain.
+- **Owns its Trait Resource**: Defines the concrete `Trait` resource (e.g., `VisualData`, `StatValues`) that implements `TraitModule.Trait`.
+- **Genetic Inheritance**: Implements `createChildTrait()` and `createMitosisChild()` to define how its specific traits are inherited and mutated.
+- **Evolution Logic**: Implements `evolveAccumulative()` to define how its traits change over time. This function should be designed to calculate the *total effect* of `steps` efficiently without iterating if possible, or by iterating internally with step-specific seed generation based on the input `seeds`.
+
+## Advanced Genetic Systems for NFTs (e.g., `ReproductionModuleV2.cdc`)
+- **Genetic Markers**: Represent unique genetic sequences (e.g., an array of `UFix64` values, or a struct with named genes).
+- **Dominance/Recessive Logic**: Can be implemented within `createChildTrait` if traits follow such patterns.
+- **Fertility & Maturity**: Can be specific traits within a module or global NFT state affecting reproduction calls.
+- **Mutations**: Introduce rare mutations algorithmically within `createChildTrait` or `createMitosisChild` based on a seed.
+- **Heritability Rules**: Each trait module defines its own rules: averaging, blending, discrete selection, etc.
+
+## Benefits of Modular Design for Complex NFTs:
+- **Scalability**: Easier to add new traits or behaviors by creating new modules.
+- **Maintainability**: Code is organized and easier to debug/update.
+- **Flexibility**: Different NFTs can use different combinations of modules.
+- **Testability**: Individual modules can be tested in isolation.
+- **Gas Efficiency**: Lazy initialization and optimized `evolveAccumulative` help manage computation.
+
+## Immutable Field Workarounds in Deployed Contracts
+- **Problem**: `init()` functions in deployed contracts are immutable. If you add a new field to a resource/struct, existing instances won't have it initialized via `init()`.
+- **Solution 1 (Lazy Initialization / Defaulting in Accessors)**: When a function accesses the new field, check if it's in a default/uninitialized state (e.g., `nil` for optionals, `0.0` for `UFix64` if that's distinguishable) and initialize it then.
+  ```cadence
+  access(all) resource MyResource {
+      access(all) var existingField: String
+      access(all) var newField: UFix64? // Added after deployment
+
+      init(existing: String) {
+          self.existingField = existing
+          // newField was not in the original init()
+          self.newField = nil 
+      }
+
+      access(all) view fun getNewFieldValue(): UFix64 {
+          if self.newField == nil {
+              // self.newField = 10.0 // Cannot directly assign in a view function
+              // This pattern is better for functions that can mutate:
+              // if self.newField == nil { self.newField = computeDefault() }
+              // For view functions, return a default or signal it needs initialization.
+              return 0.0 // Default or indicate it needs setting
+          }
+          return self.newField!
+      }
+      access(all) fun ensureNewFieldInitialized() {
+          if self.newField == nil {
+              self.newField = 10.0 // Default value
+          }
+      }
+  }
+  ```
+- **Solution 2 (Explicit Update Function)**: Add a new public function to the contract/resource that users or an admin can call to initialize the new field for existing instances.
+- **Consider for New Designs**: Make fields optional if they might be added later, or provide setter functions.
+
+## Secure Capability Management
+- **Statement**: Restrict capability exposure. Store `PrivatePath` capabilities internally. For external access, link `PublicPath` capabilities with restrictive interfaces exposing only necessary functionality.
+- **Example**:
+  ```cadence
+  // In your contract
+  access(all) contract MyAsset {
+      // ... (other definitions) ...
+
+      // Admin Capability (Private)
+      access(all) resource Admin {
+          access(all) fun createNewThing(): @NonFungibleToken.NFT {
+              // ... logic to create something ...
+              return <- create NonFungibleToken.NFT(/* ... */)
+          }
+      }
+
+      // Public Minter Interface (more restrictive)
+      access(all) resource interface PublicMinter {
+          access(all) fun mintNFT(): @NonFungibleToken.NFT
+      }
+
+      // Resource implementing the public interface
+      access(all) resource Minter: PublicMinter {
+          access(all) fun mintNFT(): @NonFungibleToken.NFT {
+              // Secure logic to mint an NFT
+              log("Public Minter minting NFT")
+              return <- create NonFungibleToken.NFT(/* ... */)
+          }
+      }
+
+      init() {
+          // ...
+          // Create and securely store the Admin capability
+          self.account.storage.save(<- create Admin(), to: /storage/myAssetAdmin)
+
+          // Create the public Minter and save it, then link a public capability
+          self.account.storage.save(<- create Minter(), to: /storage/myAssetPublicMinter)
+          self.account.capabilities.publish(
+              self.account.capabilities.storage.issue<&Minter{PublicMinter}>(/storage/myAssetPublicMinter),
+              at: /public/myAssetPublicMinter
+          )
+          // ...
+      }
+  }
+  ```
+- **Why**: Minimizes attack surface and ensures interactions occur through well-defined entry points with least privilege.
+
+## Explicit Resource Handling
+- **Statement**: Every resource (`@`) must have a clear destination: moved to a new location (variable, storage, return parameter) or explicitly destroyed using `destroy`. Prevent resources from becoming orphaned or inaccessible.
+- **Example**:
+  ```cadence
+  access(all) resource MyResource {
+      access(all) let id: UInt64
+      init(id: UInt64) {
+          self.id = id
+      }
+  }
+
+  access(all) fun processResource(r: @MyResource) {
+      log(r.id)
+      // Resource 'r' must be handled here
+      // Option 1: Move it elsewhere (if function allows or returns it)
+      // Option 2: Destroy it if no longer needed
+      destroy r
+  }
+
+  access(all) fun createAndStore() {
+      let newRes <- create MyResource(id: 1)
+      // Move to storage
+      self.account.storage.save(<-newRes, to: /storage/myResourceExample)
+
+      // Retrieve and process
+      let storedRes <- self.account.storage.load<@MyResource>(from: /storage/myResourceExample)
+                          ?? panic("Resource not found")
+      processResource(r: <-storedRes) // 'processResource' takes ownership of 'storedRes'
+  }
+  ```
+- **Why**: Resources are unique and linear. Incorrect handling can lead to their loss or inconsistent contract states.
+
+## Standardized Event Emission
+- **Statement**: Define a consistent format for events, including the contract name as a prefix (e.g., `MyContract.EventName`) and key identifiers (e.g., `nftID`, `itemID`, `recipient`). Emit events for all significant actions.
+- **Example**:
+  ```cadence
+  access(all) contract MyAwesomeNFT {
+      access(all) event MyAwesomeNFT.Minted(nftID: UInt64, recipient: Address)
+      access(all) event MyAwesomeNFT.Transferred(nftID: UInt64, from: Address, to: Address)
+
+      // ... (inside a minting function)
+      // emit MyAwesomeNFT.Minted(nftID: newNFT.id, recipient: recipient.address)
+
+      // ... (inside a transfer function)
+      // emit MyAwesomeNFT.Transferred(nftID: nft.id, from: oldOwner.address, to: newOwner.address)
+      init() { /* ... */ }
+  }
+  ```
+- **Why**: Facilitates off-chain indexing and monitoring by dApps and services.

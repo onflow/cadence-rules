@@ -1,0 +1,88 @@
+---
+description: Defines personalized development preferences and communication style for Flow blockchain development including concise response formatting, documentation-driven problem solving, iterative workflow methodology, full-stack awareness, and systematic error resolution. Guides AI behavior to match user's preferred development philosophy with emphasis on official Flow patterns, practical solutions, and proactive error prevention across the entire development stack.
+alwaysApply: false
+---
+# User Development Preferences
+
+## Communication & Response Style
+- **Conciseness**: Provide clear, actionable solutions without excessive explanation, but ensure core concepts for error prevention are covered.
+- **Practical Focus**: Prioritize working solutions and code examples over purely theoretical explanations.
+- **Proactive Error Prevention**: When providing solutions, also include brief explanations of *why* the error occurred and how to prevent similar issues, referencing relevant rules or patterns.
+
+## Development Philosophy
+- **Documentation-Driven**: Always reference official documentation (Flow, Cadence, FCL JS) when available.
+- **Standard Compliance**: Prefer established Flow/Cadence patterns and FCL best practices over custom solutions.
+- **Iterative Approach**: Fix issues one at a time. Test frequently at each stage (contract, transaction, FCL integration, UI).
+- **Full-Stack Awareness**: Solutions should consider the entire stack: Cadence contracts, transaction scripts, FCL configuration, and frontend JavaScript/UI implications.
+- **Official Examples**: Use official tutorials and core contract repositories (e.g., Flow's NFT contracts) as primary reference points.
+
+## Problem-Solving Approach
+- **Root Cause Analysis**: Identify the underlying issue rather than just symptoms. This includes checking network configurations, contract addresses, FCL setup, and authorization scopes.
+- **Pattern Recognition**: Learn from previous similar issues (e.g., FCL config errors, authorization mismatches, deployed vs. local code discrepancies) to prevent future occurrences.
+- **Documentation Reference**: Consult official sources before creating custom solutions or workarounds.
+- **Incremental Progress**: Make small, testable changes, especially when debugging complex interactions between frontend and blockchain.
+- **Isolate the Problem**: When facing complex errors, simplify the scenario (e.g., minimal transaction, basic FCL call, static UI component) to pinpoint the source of the issue.
+
+## Code Quality Expectations
+- **Follow Standards**: Adhere to platform-specific best practices (Flow NFT standards, FCL config, Cadence syntax).
+- **Consistency**: Maintain consistent patterns within and across projects, especially for FCL setup and transaction construction.
+- **Completeness**: Implement all required interfaces and methods fully. Ensure transactions have correct and complete authorizations.
+- **Testing**: Verify changes work across the stack (emulator, testnet, frontend interaction) before moving to next steps.
+- **Clarity and Readability**: Code (Cadence, JS) should be clear. UI elements related to blockchain interaction should provide unambiguous feedback.
+
+## Workflow Preferences
+- **Thorough Setup**: Ensure project configuration (`flow.json`, FCL `config.js`, environment variables for contract addresses) is correct and synchronized *before* intensive development or debugging.
+- **Emulator First, then Testnet**: Test contract logic on the emulator, then integrate with frontend via FCL on emulator, then deploy to Testnet and repeat FCL/frontend testing.
+- **Error-Driven Learning**: When errors occur, use them as learning opportunities to refine understanding of Flow, Cadence, or FCL.
+- **Documentation Integration**: Incorporate learnings and common error resolutions into reusable rules/patterns (as we are doing).
+- **User Experience (UX) for dApps**: For UI-related tasks, prioritize clear user feedback for blockchain interactions (loading states, success/error messages, transaction status). Ensure modals and other UI elements are user-friendly.
+
+## Error Resolution Style
+- **Systematic Debugging**: Address errors methodically, one at a time. Use browser dev tools for FCL, CLI output for Cadence/deployment.
+- **Reference-Based Solutions**: Look to official examples, documentation, and established patterns.
+- **Pattern Application**: Apply learned patterns (e.g., for FCL config, transaction authorization, modular design) to similar situations.
+- **Prevention Focus**: Establish practices (like those in these rules) to avoid repeating the same errors, particularly configuration errors between frontend and backend.
+- **Log and Inspect**: Utilize `console.log` in frontend JavaScript and `log()` (sparingly) in Cadence during development to trace execution and inspect state.
+
+# User Development Preferences
+
+## Communication & Response Style
+- **Conciseness**: Provide clear, actionable solutions without excessive explanation, but ensure core concepts for error prevention are covered.
+- **Practical Focus**: Prioritize working solutions and code examples over purely theoretical explanations.
+- **Proactive Error Prevention**: When providing solutions, also include brief explanations of *why* the error occurred and how to prevent similar issues, referencing relevant rules or patterns.
+
+## Development Philosophy
+- **Documentation-Driven**: Always reference official documentation (Flow, Cadence, FCL JS) when available.
+- **Standard Compliance**: Prefer established Flow/Cadence patterns and FCL best practices over custom solutions.
+- **Iterative Approach**: Fix issues one at a time. Test frequently at each stage (contract, transaction, FCL integration, UI).
+- **Full-Stack Awareness**: Solutions should consider the entire stack: Cadence contracts, transaction scripts, FCL configuration, and frontend JavaScript/UI implications.
+- **Official Examples**: Use official tutorials and core contract repositories (e.g., Flow's NFT contracts) as primary reference points.
+
+## Problem-Solving Approach
+- **Root Cause Analysis**: Identify the underlying issue rather than just symptoms. This includes checking network configurations, contract addresses, FCL setup, and authorization scopes.
+- **Pattern Recognition**: Learn from previous similar issues (e.g., FCL config errors, authorization mismatches, deployed vs. local code discrepancies) to prevent future occurrences.
+- **Documentation Reference**: Consult official sources before creating custom solutions or workarounds.
+- **Incremental Progress**: Make small, testable changes, especially when debugging complex interactions between frontend and blockchain.
+- **Isolate the Problem**: When facing complex errors, simplify the scenario (e.g., minimal transaction, basic FCL call, static UI component) to pinpoint the source of the issue.
+
+## Code Quality Expectations
+- **Follow Standards**: Adhere to platform-specific best practices (Flow NFT standards, FCL config, Cadence syntax).
+- **Consistency**: Maintain consistent patterns within and across projects, especially for FCL setup and transaction construction.
+- **Completeness**: Implement all required interfaces and methods fully. Ensure transactions have correct and complete authorizations.
+- **Testing**: Verify changes work across the stack (emulator, testnet, frontend interaction) before moving to next steps.
+- **Clarity and Readability**: Code (Cadence, JS) should be clear. UI elements related to blockchain interaction should provide unambiguous feedback.
+
+## Workflow Preferences
+- **Thorough Setup**: Ensure project configuration (`flow.json`, FCL `config.js`, environment variables for contract addresses) is correct and synchronized *before* intensive development or debugging.
+- **Emulator First, then Testnet**: Test contract logic on the emulator, then integrate with frontend via FCL on emulator, then deploy to Testnet and repeat FCL/frontend testing.
+- **Error-Driven Learning**: When errors occur, use them as learning opportunities to refine understanding of Flow, Cadence, or FCL.
+- **Documentation Integration**: Incorporate learnings and common error resolutions into reusable rules/patterns (as we are doing).
+- **User Experience (UX) for dApps**: For UI-related tasks, prioritize clear user feedback for blockchain interactions (loading states, success/error messages, transaction status). Ensure modals and other UI elements are user-friendly.
+
+## Error Resolution Style
+- **Systematic Debugging**: Address errors methodically, one at a time. Use browser dev tools for FCL, CLI output for Cadence/deployment.
+- **Reference-Based Solutions**: Look to official examples, documentation, and established patterns.
+- **Pattern Application**: Apply learned patterns (e.g., for FCL config, transaction authorization, modular design) to similar situations.
+- **Prevention Focus**: Establish practices (like those in these rules) to avoid repeating the same errors, particularly configuration errors between frontend and backend.
+- **Log and Inspect**: Utilize `console.log` in frontend JavaScript and `log()` (sparingly) in Cadence during development to trace execution and inspect state.
+

@@ -1,0 +1,208 @@
+---
+description: Comprehensive guide to Flow project configuration and flow.json management covering account setup, contract registration, deployment configuration, network-specific aliases, and FCL integration. Includes best practices for multi-network consistency, common configuration errors prevention, contract address management, and synchronization between backend deployment and frontend FCL configuration across emulator, testnet, and mainnet environments.
+alwaysApply: false
+---
+# Flow Project Configuration Best Practices (`flow.json`)
+
+## `flow.json` Structure Overview
+- **`accounts`**: Defines named accounts, their addresses, and private keys. Critical for deployment and signing.
+- **`contracts`**: Lists contracts in the project, their source files, and network-specific aliases (which contract name maps to which address on a given network).
+- **`deployments`**: Records which contracts are deployed to which accounts on specific networks.
+- **`networks`**: Defines connection details for different networks (emulator, testnet, mainnet).
+
+## Account Configuration (`accounts` section)
+- **Account Name Accuracy**: Double-check account names for typos (e.g., `testnet-deployer` not `tesnet-deployer`). This name is used with `flow ... --signer <account-name>`.
+- **Key File Paths**: Ensure key file paths (e.g., `testnet-deployer.pkey`) are correct relative to `flow.json` and match the account names.
+- **Address Consistency**: 
+    - The `address` field for an account in `flow.json` MUST be the actual on-chain address for that account on the target network.
+    - This address is used by FCL if configured to resolve account names locally.
+- **Private Keys**: Securely manage private key files. Do not commit them to public repositories if they control real assets. Use `.gitignore`.
+
+## Standard Contract Aliases (`contracts` section & FCL Config)
+- **Purpose**: Aliases in `flow.json` (within the `contracts` section) tell the Flow CLI where to find a contract *if it were deployed by an account defined in this `flow.json`*. 
+- **FCL Configuration is Key for Imports**: For frontend FCL to correctly resolve `import MyContract from "MyContract"` or `import MyContract from 0xALIAS`, the FCL configuration (e.g., in `config.js`) must map these placeholder names/aliases to actual on-chain addresses for the current network.
+  ```javascript
+  // Frontend FCL config.js example
+  fcl.config({
+    // ... other FCL settings ...
+    "flow.network": "testnet",
+    "0xNonFungibleToken": "0x631e88ae7f1d7c20", // Testnet NonFungibleToken address
+    "0xMetadataViews": "0x631e88ae7f1d7c20",    // Testnet MetadataViews address
+    "0xMyProjectNFT": "0xabcdef1234567890"     // Your project's deployed contract address on Testnet
+  });
+  ```
+- **Official Addresses**: Always verify and use the latest official addresses for standard contracts on the target network.
+    - Testnet: `NonFungibleToken: 0x631e88ae7f1d7c20`, `MetadataViews: 0x631e88ae7f1d7c20`, `FungibleToken: 0x9a0766d93b6608b7`
+    - Emulator: Addresses are usually fixed based on the emulator's initial accounts (e.g., `0xf8d6e0586b0a20c7` for `NonFungibleToken` on default emulator setup).
+
+## Contract Registration and Aliasing (`contracts` section)
+- **Pre-deployment Registration**: ALWAYS add new contracts to the `contracts` section of `flow.json` *before* running `flow project deploy`.
+- **Source Path Accuracy**: Ensure contract source paths (`MyContract: ../cadence/contracts/MyContract.cdc`) correctly point to the actual `.cdc` file locations relative to `flow.json`.
+- **Network-specific Aliases**: 
+    - An alias in `contracts` (e.g., `MyProjectNFT: 0xEMULATOR_ADDRESS`) allows you to `import MyProjectNFT from "./MyProjectNFT"` and have the CLI replace it during deployment to that emulator account.
+    - For imports from *other* projects (like standard contracts), use their direct address or an FCL-managed alias (see above).
+
+## Deployment Configuration (`deployments` section)
+- **Accurate Signer**: The `account` specified for a deployment MUST be a named account from your `accounts` section with the correct keys for the target network.
+- **Contract List**: Ensure all contracts intended for deployment are listed with their correct names (matching names in the `contracts` section).
+- **Network Specificity**: Deployments are network-specific. A deployment to `emulator` does not affect `testnet`.
+
+## Deployment Best Practices
+- **Emulator First**: Always use `flow project deploy --network=emulator` (or just `flow project deploy` if emulator is default) to test contract logic and deployment configuration locally.
+- **Testnet Deployment**: After successful emulator deployment and testing, use `flow project deploy --network=testnet --signer <your-testnet-account-name>`.
+- **Sufficient FLOW**: Ensure the deploying account has enough FLOW tokens for deployment fees on testnet/mainnet.
+- **`--update` Flag**: Use `flow project deploy --network=<network> --update` to update existing contracts. Note that changes to `init()` or resource/struct field definitions are often breaking and may require deploying a new contract version instead of a simple update.
+
+## Common `flow.json` and CLI Errors & Prevention
+- **Typos**: Carefully check for typos in account names, file paths, contract names, and addresses.
+- **Address Mismatches**: Ensure contract addresses are consistent between `flow.json` sections, your Cadence `import` statements, and your frontend FCL configuration for the target network.
+- **Incorrect Signer/Network for CLI**: 
+    - When running `flow transactions send ... --signer <name> --network <network>`, ensure `<name>` is correctly defined in `flow.json` for that `<network>` and has the right address/keys.
+    - A common error is using an emulator signer name/address when targeting testnet, or vice-versa.
+- **"failed to get contract" / "failed to resolve import"**: 
+    - For CLI: The contract alias might be missing or incorrect in `flow.json` for the current network, or the source file path is wrong.
+    - For FCL (frontend): The FCL config is missing the address mapping for the import placeholder, or the address is wrong for the target network.
+- **Permission Denied (Key Files)**: Ensure key files are readable by the CLI.
+
+## Interaction with Frontend (FCL)
+- **Synchronized Configuration**: The contract addresses and network information used by FCL in the frontend *must* align with your `flow.json` and actual on-chain deployment addresses for the target network.
+- **Environment Variables**: Use environment variables (e.g., `.env` files for Next.js/React) to manage network-specific contract addresses and FCL settings for different environments (development, staging, production).
+
+## Strict `flow.json` Management for Multi-Network Consistency
+- **Statement**: Maintain distinct and accurate configurations within `flow.json` for each network environment (emulator, testnet, mainnet). This includes defining separate aliases for contracts deployed to different networks and ensuring account addresses are correct for each environment. Regularly audit these configurations, especially contract addresses and import paths, before switching networks or performing deployments.
+- **Example Snippet (Conceptual for `flow.json` structure)**:
+  ```json
+  {
+    "contracts": {
+      "MyNFT_Emulator": "./cadence/contracts/MyNFT.cdc",
+      "MyNFT_Testnet": "./cadence/contracts/MyNFT.cdc"
+    },
+    "deployments": {
+      "emulator": {
+        "emulator-account": ["MyNFT_Emulator"]
+      },
+      "testnet": {
+        "testnet-account": ["MyNFT_Testnet"]
+      }
+    },
+    "networks": {
+      "emulator": "127.0.0.1:3569",
+      "testnet": "access.devnet.nodes.onflow.org:9000"
+    },
+    "accounts": {
+      "emulator-account": {
+        "address": "0xf8d6e0586b0a20c", // Example emulator address
+        "key": "..."
+      },
+      "testnet-account": {
+        "address": "0xYourTestnetAccountAddress", // Example testnet address
+        "key": "..."
+      }
+    }
+  }
+  ```
+- **Why**: Prevents common deployment errors, ensures transactions interact with the correct contract instances on the intended network, and simplifies switching between development environments. Using network-specific aliases (e.g., `MyNFT_Emulator`, `MyNFT_Testnet` aliasing the same source file but deployed differently) can make scripts more robust.
+
+
+# Flow Project Configuration Best Practices (`flow.json`)
+
+## `flow.json` Structure Overview
+- **`accounts`**: Defines named accounts, their addresses, and private keys. Critical for deployment and signing.
+- **`contracts`**: Lists contracts in the project, their source files, and network-specific aliases (which contract name maps to which address on a given network).
+- **`deployments`**: Records which contracts are deployed to which accounts on specific networks.
+- **`networks`**: Defines connection details for different networks (emulator, testnet, mainnet).
+
+## Account Configuration (`accounts` section)
+- **Account Name Accuracy**: Double-check account names for typos (e.g., `testnet-deployer` not `tesnet-deployer`). This name is used with `flow ... --signer <account-name>`.
+- **Key File Paths**: Ensure key file paths (e.g., `testnet-deployer.pkey`) are correct relative to `flow.json` and match the account names.
+- **Address Consistency**: 
+    - The `address` field for an account in `flow.json` MUST be the actual on-chain address for that account on the target network.
+    - This address is used by FCL if configured to resolve account names locally.
+- **Private Keys**: Securely manage private key files. Do not commit them to public repositories if they control real assets. Use `.gitignore`.
+
+## Standard Contract Aliases (`contracts` section & FCL Config)
+- **Purpose**: Aliases in `flow.json` (within the `contracts` section) tell the Flow CLI where to find a contract *if it were deployed by an account defined in this `flow.json`*. 
+- **FCL Configuration is Key for Imports**: For frontend FCL to correctly resolve `import MyContract from "MyContract"` or `import MyContract from 0xALIAS`, the FCL configuration (e.g., in `config.js`) must map these placeholder names/aliases to actual on-chain addresses for the current network.
+  ```javascript
+  // Frontend FCL config.js example
+  fcl.config({
+    // ... other FCL settings ...
+    "flow.network": "testnet",
+    "0xNonFungibleToken": "0x631e88ae7f1d7c20", // Testnet NonFungibleToken address
+    "0xMetadataViews": "0x631e88ae7f1d7c20",    // Testnet MetadataViews address
+    "0xMyProjectNFT": "0xabcdef1234567890"     // Your project's deployed contract address on Testnet
+  });
+  ```
+- **Official Addresses**: Always verify and use the latest official addresses for standard contracts on the target network.
+    - Testnet: `NonFungibleToken: 0x631e88ae7f1d7c20`, `MetadataViews: 0x631e88ae7f1d7c20`, `FungibleToken: 0x9a0766d93b6608b7`
+    - Emulator: Addresses are usually fixed based on the emulator's initial accounts (e.g., `0xf8d6e0586b0a20c7` for `NonFungibleToken` on default emulator setup).
+
+## Contract Registration and Aliasing (`contracts` section)
+- **Pre-deployment Registration**: ALWAYS add new contracts to the `contracts` section of `flow.json` *before* running `flow project deploy`.
+- **Source Path Accuracy**: Ensure contract source paths (`MyContract: ../cadence/contracts/MyContract.cdc`) correctly point to the actual `.cdc` file locations relative to `flow.json`.
+- **Network-specific Aliases**: 
+    - An alias in `contracts` (e.g., `MyProjectNFT: 0xEMULATOR_ADDRESS`) allows you to `import MyProjectNFT from "./MyProjectNFT"` and have the CLI replace it during deployment to that emulator account.
+    - For imports from *other* projects (like standard contracts), use their direct address or an FCL-managed alias (see above).
+
+## Deployment Configuration (`deployments` section)
+- **Accurate Signer**: The `account` specified for a deployment MUST be a named account from your `accounts` section with the correct keys for the target network.
+- **Contract List**: Ensure all contracts intended for deployment are listed with their correct names (matching names in the `contracts` section).
+- **Network Specificity**: Deployments are network-specific. A deployment to `emulator` does not affect `testnet`.
+
+## Deployment Best Practices
+- **Emulator First**: Always use `flow project deploy --network=emulator` (or just `flow project deploy` if emulator is default) to test contract logic and deployment configuration locally.
+- **Testnet Deployment**: After successful emulator deployment and testing, use `flow project deploy --network=testnet --signer <your-testnet-account-name>`.
+- **Sufficient FLOW**: Ensure the deploying account has enough FLOW tokens for deployment fees on testnet/mainnet.
+- **`--update` Flag**: Use `flow project deploy --network=<network> --update` to update existing contracts. Note that changes to `init()` or resource/struct field definitions are often breaking and may require deploying a new contract version instead of a simple update.
+
+## Common `flow.json` and CLI Errors & Prevention
+- **Typos**: Carefully check for typos in account names, file paths, contract names, and addresses.
+- **Address Mismatches**: Ensure contract addresses are consistent between `flow.json` sections, your Cadence `import` statements, and your frontend FCL configuration for the target network.
+- **Incorrect Signer/Network for CLI**: 
+    - When running `flow transactions send ... --signer <name> --network <network>`, ensure `<name>` is correctly defined in `flow.json` for that `<network>` and has the right address/keys.
+    - A common error is using an emulator signer name/address when targeting testnet, or vice-versa.
+- **"failed to get contract" / "failed to resolve import"**: 
+    - For CLI: The contract alias might be missing or incorrect in `flow.json` for the current network, or the source file path is wrong.
+    - For FCL (frontend): The FCL config is missing the address mapping for the import placeholder, or the address is wrong for the target network.
+- **Permission Denied (Key Files)**: Ensure key files are readable by the CLI.
+
+## Interaction with Frontend (FCL)
+- **Synchronized Configuration**: The contract addresses and network information used by FCL in the frontend *must* align with your `flow.json` and actual on-chain deployment addresses for the target network.
+- **Environment Variables**: Use environment variables (e.g., `.env` files for Next.js/React) to manage network-specific contract addresses and FCL settings for different environments (development, staging, production).
+
+## Strict `flow.json` Management for Multi-Network Consistency
+- **Statement**: Maintain distinct and accurate configurations within `flow.json` for each network environment (emulator, testnet, mainnet). This includes defining separate aliases for contracts deployed to different networks and ensuring account addresses are correct for each environment. Regularly audit these configurations, especially contract addresses and import paths, before switching networks or performing deployments.
+- **Example Snippet (Conceptual for `flow.json` structure)**:
+  ```json
+  {
+    "contracts": {
+      "MyNFT_Emulator": "./cadence/contracts/MyNFT.cdc",
+      "MyNFT_Testnet": "./cadence/contracts/MyNFT.cdc"
+    },
+    "deployments": {
+      "emulator": {
+        "emulator-account": ["MyNFT_Emulator"]
+      },
+      "testnet": {
+        "testnet-account": ["MyNFT_Testnet"]
+      }
+    },
+    "networks": {
+      "emulator": "127.0.0.1:3569",
+      "testnet": "access.devnet.nodes.onflow.org:9000"
+    },
+    "accounts": {
+      "emulator-account": {
+        "address": "0xf8d6e0586b0a20c", // Example emulator address
+        "key": "..."
+      },
+      "testnet-account": {
+        "address": "0xYourTestnetAccountAddress", // Example testnet address
+        "key": "..."
+      }
+    }
+  }
+  ```
+- **Why**: Prevents common deployment errors, ensures transactions interact with the correct contract instances on the intended network, and simplifies switching between development environments. Using network-specific aliases (e.g., `MyNFT_Emulator`, `MyNFT_Testnet` aliasing the same source file but deployed differently) can make scripts more robust.
+
+

@@ -1,0 +1,647 @@
+---
+description: Comprehensive workflow and best practices guide for Flow blockchain development covering the complete development lifecycle from setup through mainnet deployment. Includes documentation-first debugging methodology, transaction authorization patterns, FCL integration best practices, deployment verification protocols, optimization techniques for computation limits, error resolution strategies, and testnet validation procedures. Emphasizes official Flow documentation usage and iterative development approach for both Cadence contracts and frontend integration.
+alwaysApply: false
+---
+# Flow Development Workflow
+
+## Documentation-First Approach
+**User Preference**: Always reference official Flow documentation and standard examples when encountering issues or implementing new features.
+
+### Primary Documentation Sources
+1. **Flow Standard Contracts** - Reference deployed standard contracts (NonFungibleToken, MetadataViews) as implementation examples
+2. **Official Flow Docs** - https://developers.flow.com/
+3. **Cadence Language Reference** - For syntax and type system clarification
+4. **Flow CLI Documentation** - For deployment and project management
+5. **Flow Core Contracts Repository** - https://github.com/onflow/flow-nft for real working examples
+6. **FCL JS Documentation** - https://docs.onflow.org/fcl/ for frontend integration
+
+## Debugging Methodology
+When encountering Cadence compilation or deployment errors:
+
+1. **Reference Standard Contracts**: Compare against deployed standard contracts on Mainnet/Testnet
+2. **Check Official Patterns**: Verify that your code follows established Flow patterns from docs
+3. **Iterative Problem Solving**: Fix one error at a time, test frequently
+4. **Documentation Lookup**: Consult official docs for syntax clarification
+5. **Core Contract Inspection**: Examine Flow's core contracts for reference patterns
+
+## Development Sequence
+1. **Project Setup**: Ensure `flow.json` and frontend FCL configuration (`config.js`) are correctly set up before coding.
+2. **Emulator Testing**: Always test contracts on emulator first.
+3. **Frontend Emulator Integration**: Test frontend interactions with emulator using FCL.
+4. **Standard Compliance**: Verify NFT contracts implement required interfaces.
+5. **Metadata Implementation**: Add MetadataViews for marketplace compatibility.
+6. **Testnet Deployment**: Deploy to testnet only after successful emulator testing.
+7. **Frontend Testnet Integration**: Rigorously test frontend FCL interactions with testnet.
+8. **Post-Deployment Verification**: ALWAYS verify deployment success before using transactions.
+
+## Transaction Authorization Rules
+### Essential Authorization Capabilities
+All transactions that modify storage or capabilities MUST include appropriate `auth` capabilities.
+For general storage operations, ensure full capabilities if needed:
+```cadence
+prepare(signer: auth(Storage) &Account) // Or more granular like: auth(Mutate, Insert, Remove) &Account
+// If only specific capabilities are needed, list them:
+// prepare(signer: auth(BorrowValue, IssueStorageCapabilityController, SaveValue, UnpublishCapability, PublishCapability) &Account)
+```
+- **Transaction Intent**: Clearly understand what the transaction needs to do to determine the minimal sufficient authorizations. Over-authorizing can be a security risk.
+
+### Authorization by Operation Type
+- **Storage Read**: `BorrowValue`
+- **Storage Write/Save**: `SaveValue` or `Storage` (or `Mutate, Insert, Remove`)
+- **Capability Creation**: `IssueStorageCapabilityController`
+- **Capability Publishing**: `PublishCapability`
+- **Capability Unpublishing**: `UnpublishCapability`
+
+## Deployment Verification Protocol
+After each contract deployment:
+
+1. **Verify Deployment Success**: Check CLI output for successful deployment.
+2. **Test Contract Access**: Create verification script (or use frontend) to test contract members.
+3. **Validate Public Members**: Ensure paths (e.g., `CollectionStoragePath`) and functions are accessible and have the expected signatures as per the *deployed* contract.
+4. **Function Signature Check**: Verify function signatures match expectations.
+
+### Verification Script Template
+```cadence
+import ContractName from 0xADDRESS
+
+pub fun main(): {String: String} {
+    let result: {String: String} = {}
+    
+    // Test each critical member
+    do {
+        let path = ContractName.CollectionStoragePath
+        result["CollectionStoragePath"] = "OK"
+    } catch {
+        result["CollectionStoragePath"] = "MISSING or Inaccessible"
+    }
+    // Add checks for other public members and function signatures if possible via scripts
+    return result
+}
+```
+
+## Error Resolution Strategy
+- **Syntax Errors**: Check Cadence language reference for correct type syntax.
+- **Interface Errors**: Compare against standard NFT contract implementations.
+- **Deployment Errors**: Verify `flow.json` configuration, account setup, and FCL config.
+- **Type Errors**: Reference official examples for proper resource type usage.
+- **Authorization Errors**: Add missing or correct `auth` capabilities in the transaction `prepare()` function. Verify signer has these capabilities.
+- **Unknown Member Errors**: Verify contract deployment, check that the member is public in the *deployed* contract, and ensure frontend FCL is configured with the correct contract address and network.
+- **"transaction failed to decode"**: Often due to FCL configuration issues (network mismatch, incorrect address for imports) or transaction syntax errors.
+- **Computation Limit Exceeded**: Optimize Cadence code (see "Optimizing for Computation Limits"), reduce transaction scope, or process in batches.
+- **FCL Errors**: Use browser developer tools (console, network tab) to inspect FCL requests and responses. Check FCL configuration (`accessNode.api`, `discovery.wallet`).
+
+## Frontend (FCL) Integration Best Practices
+- **Network Configuration**: Ensure frontend FCL configuration (`config.js` or equivalent) explicitly sets the correct `accessNode.api` and `discovery.wallet` for the target network (emulator, testnet, mainnet). Mismatches are a common source of errors.
+  ```javascript
+  // Example config.js for Testnet
+  fcl.config({
+    "app.detail.title": "My Flow App",
+    "app.detail.icon": "https://placekitten.com/g/200/200",
+    "accessNode.api": "https://rest-testnet.onflow.org", // Testnet
+    "discovery.wallet": "https://fcl-discovery.onflow.org/testnet/authn" // Testnet
+    // For Emulator:
+    // "accessNode.api": "http://localhost:8888",
+    // "discovery.wallet": "http://localhost:8701/fcl/authn", // If using dev-wallet
+  });
+  ```
+- **Contract Address Management**: Store contract addresses in a centralized place (e.g., environment variables, config file) and ensure the frontend uses the correct addresses for the active network.
+- **Dynamic Imports**: Use FCL's ability to replace import placeholders in Cadence code with actual addresses from your configuration.
+  ```javascript
+  // In your transaction/script Cadence code:
+  // import MyContract from 0xMyContractPlaceholder
+  
+  // When sending transaction with FCL:
+  // fcl.mutate({
+  //   cadence: `...`,
+  //   args: (...) => [...],
+  //   proposer: ...,
+  //   payer: ...,
+  //   authorizations: [...],
+  //   limit: 9999,
+  //   replace: {
+  //     "0xMyContractPlaceholder": process.env.NEXT_PUBLIC_MY_CONTRACT_ADDRESS 
+  //   }
+  // });
+  ```
+- **User Authentication**: Handle `fcl.currentUser` state changes correctly to update UI (show/hide login buttons, display user address).
+- **Transaction Lifecycle UI**:
+    - Provide clear visual feedback to the user during all stages of a transaction (Sending, Pending, Sealed, Error).
+    - Use loading indicators.
+    - Display success and error messages clearly.
+    - Prevent users from submitting multiple identical transactions.
+- **Modal Management (UI/UX)**:
+    - Ensure modals (e.g., for tutorials, transaction status) have appropriate z-index to appear above other content.
+    - Provide clear ways to close modals (e.g., "X" button, Escape key).
+    - Persist "seen" state for one-time modals (like tutorials) using `localStorage`.
+
+## Code Quality Standards
+- Follow established patterns from official Flow core contracts and documentation.
+- Implement all required standard interfaces completely.
+- Use consistent naming conventions (prefer official Flow patterns).
+- Structure code according to standard NFT patterns from Flow documentation.
+- Test thoroughly on emulator before testnet deployment.
+- Always include complete and correct authorization capabilities in transactions.
+- Ensure frontend FCL configuration is robust and network-aware.
+
+## When to Reference Documentation
+- **Always** when implementing NFT contracts from scratch.
+- When encountering unfamiliar Cadence syntax errors.
+- Before deploying to testnet (verify configuration, including FCL).
+- When adding new features to existing contracts or frontend interactions.
+- When debugging complex type system errors, FCL issues, or authorization/capability errors.
+- When unsure about standard interface implementations or FCL best practices.
+
+This workflow emphasizes learning from and following official Flow patterns rather than inventing custom solutions.
+
+## Optimizing for Computation Limits (Gas Fees)
+- **Identify Costly Operations**: Operations within loops that are executed frequently (e.g., 250 times per simulated day) are prime candidates for optimization. String parsing (`String.split()`) and complex calculations are particularly expensive.
+- **Minimize Operations in Loops**: If a value is constant throughout a loop (e.g., for all steps within a simulated day), calculate or parse it once outside the loop.
+- **Accumulative Logic**: For evolutionary systems or processes that occur over many steps, calculate the *accumulated effect* of those steps in a single, efficient function rather than iterating through each step individually. This drastically reduces computation.
+  ```cadence
+  // Instead of this (costly):
+  // var i = 0
+  // while i < 250 {
+  //     complexCalculation(seeds[i]) 
+  //     i = i + 1
+  // }
+  
+  // Do this (efficient):
+  // calculateAccumulatedEffectFor250Steps(seeds)
+  ```
+- **Remove or Reduce Logging**: `log()` statements, especially those involving string concatenations, are very expensive. Remove them from contracts, particularly from functions called frequently or within loops. Use events for on-chain history if needed.
+- **Process in Chunks**: If a large backlog of operations needs to be processed (e.g., many days of evolution), design transactions to process these in smaller, manageable chunks to stay within computation limits. The contract should gracefully handle partial updates and resume from where it left off.
+- **Profile and Test**: Use testnet to profile transactions that might be computationally intensive. If they hit limits, refactor the contract logic or the transaction's scope.
+
+## Optimizing Repetitive Processes: Granular vs. Periodic vs. Accumulative Logic
+Many on-chain systems involve processes that notionally occur over many small, discrete intervals (e.g., steps, ticks, turns, minutes). Directly simulating each interval can be computationally prohibitive. Here's a breakdown of approaches:
+
+- **Granular Iterative Processing (High Fidelity, Potentially High Cost)**:
+    - **Description**: Simulating every single discrete interval of a process. This provides the highest realism or accuracy as each interval can have unique inputs or random influences.
+    - **Challenge**: Can be computationally expensive if the logic per interval is complex or the number of intervals is very large, potentially exceeding transaction limits.
+
+- **Simplified Periodic Processing (Low Cost, Lower Fidelity)**:
+    - **Description**: Processing the logic only once per larger, fixed period (e.g., once per "day" if a day contains many smaller "steps", or once per "epoch").
+    - **Benefit**: Very efficient.
+    - **Drawback**: May lose the nuanced effects, accumulated randomness, or fine-grained changes that would occur across the individual discrete intervals.
+
+- **Accumulative Periodic Processing (Recommended Balance: Efficiency with Outcome Fidelity)**:
+    - **Description**: Calculate the *total net effect* of all discrete intervals that would occur within a larger period, ideally in a single, efficient operation or a condensed loop.
+    - **Goal**: To maintain the *intended outcome* of granular processing with significantly improved computational efficiency. This often involves mathematical aggregation, statistical modeling of the aggregate effect, or a more optimized simulation of the combined steps.
+    - **Benefit**: Strikes a balance by reducing computation while attempting to preserve the essential results of a more granular simulation.
+
+The following Cadence code illustrates the 'Accumulative Periodic Processing' principle within an NFT evolution context. The `NFTContract` (acting as a 'MainLogicContract') manages evolution over time, and individual `TraitModule` components (acting as 'SubProcessModules') calculate their changes accumulatively.
+  ```cadence
+  // In NFT Contract (MainLogicContract)
+  access(all) fun evolve(simulatedSecondsPerPeriod: UFix64) { // Renamed simulatedSecondsPerDay for generality
+      let DISCRETE_INTERVALS_PER_PERIOD: UInt64 = 250 // e.g., STEPS_PER_DAY
+      let elapsedIntervals = calculateElapsedIntervals(simulatedSecondsPerPeriod) // Based on real time
+
+      let completePeriods = elapsedIntervals / DISCRETE_INTERVALS_PER_PERIOD
+      let partialIntervals = elapsedIntervals % DISCRETE_INTERVALS_PER_PERIOD
+
+      // Process complete periods in bulk
+      var i: UInt64 = 0
+      while i < completePeriods {
+          // 'getPeriodSeeds' replaces 'generateDailySeeds', 'currentPeriod' replaces 'edadDiasCompletos'
+          let periodSeeds = self.getPeriodSeeds(self.currentPeriod + UFix64(i)) 
+          for module in self.modules { // 'modules' are SubProcessModules
+              module.processAccumulative(seeds: periodSeeds, intervals: DISCRETE_INTERVALS_PER_PERIOD) // 'processAccumulative' replaces 'evolveAccumulative', 'intervals' replaces 'steps'
+          }
+          // ... update global state for a full period (e.g., age, points) ...
+          self.currentPeriod = self.currentPeriod + 1.0 // Example update
+          i = i + 1
+      }
+
+      // Process remaining partial intervals
+      if partialIntervals > 0 {
+          let currentPeriodSeeds = self.getPeriodSeeds(self.currentPeriod + UFix64(completePeriods))
+          for module in self.modules {
+              module.processAccumulative(seeds: currentPeriodSeeds, intervals: partialIntervals)
+          }
+          // ... update global state for partial period ...
+      }
+      // ... update timestamps ...
+  }
+
+  // In Trait Module (SubProcessModule)
+  access(all) fun processAccumulative(seeds: [UInt64], intervals: UInt64): String { // 'processAccumulative' replaces 'evolveAccumulative', 'intervals' replaces 'steps'
+      var totalChange: UFix64 = 0.0
+      var intervalSeed = seeds[0] // Or a specific seed for this sub-process
+
+      var i: UInt64 = 0
+      while i < intervals {
+          // Generate interval-specific random (maintaining granularity outcome)
+          intervalSeed = (intervalSeed * 1664525 + 1013904223) % 4294967296
+          let randomFactor = UFix64(intervalSeed % 1000) / 999.0 // Example random influence
+          // 'baseRateOfChange' replaces 'baseEvolutionRate'
+          totalChange = totalChange + (randomFactor * baseRateOfChange) 
+          i = i + 1
+      }
+      self.traitValue = self.traitValue + totalChange // Update the specific value for this sub-process
+      // ... clamp value if necessary and return status/result ...
+      return "Processed"
+  }
+  ```
+
+## Contract Updates & Deployment
+- **Immutable Struct Changes**: If a contract's resource or struct definition changes (e.g., adding/removing fields), Flow CLI cannot perform a simple `--update`. This is treated as a breaking change.
+  - **Workaround for Deployed Contracts**: If `init()` cannot be changed, modify existing functions to set default values for new fields if they are not already initialized, or adjust logic to handle their potential absence.
+- **Versioning Strategy**: To handle breaking changes, deploy a new version of the contract (e.g., `MyContractV2.cdc`). This may require a migration strategy for existing data if applicable.
+- **`flow.json` Management**: Ensure `flow.json` correctly lists all contracts and their paths. When versioning contracts, add the new version alongside the old one if both need to be temporarily active, or replace the old entry if it's a direct upgrade.
+
+## Debugging Iteration Cycle
+- **Deploy Incrementally**: When developing complex systems with multiple contracts, deploy and test incrementally. Deploy core contracts first, then modules one by one.
+- **Use Testnet Frequently**: Deploy to testnet often to catch issues related to gas limits, state, and inter-contract calls that might not be apparent on the emulator.
+- **Targeted Error Analysis**: Examine the full error output. Flow errors often provide a stack trace pointing to the exact line in the contract and then the transaction line that triggered it.
+- **Smallest Test Case**: When a transaction fails (e.g., due to computation limits or FCL issues), try to reduce the scope of the transaction (e.g., fewer steps, simpler arguments, minimal Cadence code) to isolate the problematic code path.
+- **Correct Signer and Network**: Double-check that transactions and scripts are using the correct `--network` (testnet, emulator, mainnet) and `--signer` (the account name from `flow.json`). Mismatches, especially using an emulator account address on testnet, will cause errors.
+- **Console Logging**: Use `console.log` in JavaScript (frontend) and `log()` in Cadence (sparingly, due to gas costs in contracts) to trace execution flow and variable states.
+- **Hardcoded Values in Transactions**: Be mindful of hardcoded values in transaction scripts (e.g., `lifespanDays: 10.0`). While useful for testing, these should ideally be arguments or derived from contract state for flexibility in production.
+
+## Concise yet Complete In-Code Documentation (Docstrings)
+- **Statement**: Document all public declarations (contracts, resources, structs, interfaces, functions, events, and important fields) using Cadence docstrings. Explain the purpose, parameters, return values, and any relevant behavior or side effects.
+- **Example**:
+  ```cadence
+  access(all) contract DocumentedContract {
+
+      /// The unique ID for the next item to be created.
+      access(all) var nextItemID: UInt64
+
+      /// Event emitted when a new item is created.
+      /// - itemID: The ID of the new item.
+      /// - metadata: The metadata associated with the item.
+      access(all) event ItemCreated(itemID: UInt64, metadata: String)
+
+      init() {
+          self.nextItemID = 1
+      }
+
+      /// Creates a new item with the provided metadata.
+      /// Increments `nextItemID`.
+      /// Emits an `ItemCreated` event.
+      ///
+      /// - Parameter metadata: The metadata for the new item.
+      /// - Returns: The resource of the newly created Item.
+      ///
+      access(all) fun createItem(metadata: String): @Item {
+          let newItem <- create Item(id: self.nextItemID, metadata: metadata)
+          emit ItemCreated(itemID: self.nextItemID, metadata: metadata)
+          self.nextItemID = self.nextItemID + 1
+          return <-newItem
+      }
+
+      access(all) resource Item {
+          access(all) let id: UInt64
+          access(all) let metadata: String
+          init(id: UInt64, metadata: String) {
+              self.id = id
+              self.metadata = metadata
+          }
+      }
+  }
+  ```
+- **Why**: Enhances code understanding, facilitates maintenance, and improves collaboration.
+
+## Modularity for Evolution
+- **Statement**: Design contracts with modularity, separating functionalities into distinct modules/contracts where appropriate. This aligns with the constraint of not modifying `init()` of deployed contracts and the practice of introducing new versions of modules (e.g., `PersonalityModuleV2`).
+- **Conceptual Example (aligns with existing `EvolvingCreatureNFT` and `PersonalityModuleV2` memory):
+    *   **Core Contract** (e.g., `EvolvingCreatureNFT`): Manages the core NFT lifecycle (ID, ownership).
+    *   **Separate Modules** (e.g., `VisualModule`, `StatsModule`, `PersonalityModuleV2`): Each handles a specific aspect. The core contract can hold references or methods to interact with these modules.
+- **Why**: Facilitates updates and the addition of new functionality without altering the deployed base contract, which is critical given that `init()` cannot be modified. This supports the evolution of complex systems over time and is reinforced by existing project practices such as `PersonalityModuleV2` and the immutability of `init()` in deployed `EvolvingCreatureNFT` contract.
+
+## Comprehensive Testnet Validation Protocol Before Mainnet
+- **Statement**: Before any Mainnet deployment, conduct a rigorous end-to-end validation on Testnet. This protocol should go beyond basic functionality tests and include:
+    1.  Replication of all key user flows and edge cases.
+    2.  Interaction with other relevant contracts deployed on Testnet (if applicable, e.g., token standards, oracle services).
+    3.  Testing under simulated conditions of expected load (e.g., batch minting scripts, concurrent transactions if testable).
+    4.  Verification of all contract-emitted events, their expected payloads, and indexing by any off-chain services.
+    5.  Security audit or peer review, focusing on Testnet-deployed code and potential attack vectors.
+    6.  Confirmation of correct FCL integration and UI/UX behavior with Testnet contracts across different browsers/devices.
+    7.  A detailed, step-by-step deployment checklist for Mainnet, including `flow.json` updates for Mainnet addresses, signer account readiness, and rollback plans.
+    8.  Ensure a separate, clean, and stable Testnet environment for these validation cycles if the primary Testnet is too volatile or cluttered.
+- **Why**: Testnet is the closest environment to Mainnet. Comprehensive validation here is crucial for catching subtle bugs, integration issues, performance bottlenecks, gas limit surprises, and security oversights that might not be apparent during emulator testing. This minimizes risks associated with Mainnet deployment.
+
+
+
+
+
+
+
+# Flow Development Workflow
+
+## Documentation-First Approach
+**User Preference**: Always reference official Flow documentation and standard examples when encountering issues or implementing new features.
+
+### Primary Documentation Sources
+1. **Flow Standard Contracts** - Reference deployed standard contracts (NonFungibleToken, MetadataViews) as implementation examples
+2. **Official Flow Docs** - https://developers.flow.com/
+3. **Cadence Language Reference** - For syntax and type system clarification
+4. **Flow CLI Documentation** - For deployment and project management
+5. **Flow Core Contracts Repository** - https://github.com/onflow/flow-nft for real working examples
+6. **FCL JS Documentation** - https://docs.onflow.org/fcl/ for frontend integration
+
+## Debugging Methodology
+When encountering Cadence compilation or deployment errors:
+
+1. **Reference Standard Contracts**: Compare against deployed standard contracts on Mainnet/Testnet
+2. **Check Official Patterns**: Verify that your code follows established Flow patterns from docs
+3. **Iterative Problem Solving**: Fix one error at a time, test frequently
+4. **Documentation Lookup**: Consult official docs for syntax clarification
+5. **Core Contract Inspection**: Examine Flow's core contracts for reference patterns
+
+## Development Sequence
+1. **Project Setup**: Ensure `flow.json` and frontend FCL configuration (`config.js`) are correctly set up before coding.
+2. **Emulator Testing**: Always test contracts on emulator first.
+3. **Frontend Emulator Integration**: Test frontend interactions with emulator using FCL.
+4. **Standard Compliance**: Verify NFT contracts implement required interfaces.
+5. **Metadata Implementation**: Add MetadataViews for marketplace compatibility.
+6. **Testnet Deployment**: Deploy to testnet only after successful emulator testing.
+7. **Frontend Testnet Integration**: Rigorously test frontend FCL interactions with testnet.
+8. **Post-Deployment Verification**: ALWAYS verify deployment success before using transactions.
+
+## Transaction Authorization Rules
+### Essential Authorization Capabilities
+All transactions that modify storage or capabilities MUST include appropriate `auth` capabilities.
+For general storage operations, ensure full capabilities if needed:
+```cadence
+prepare(signer: auth(Storage) &Account) // Or more granular like: auth(Mutate, Insert, Remove) &Account
+// If only specific capabilities are needed, list them:
+// prepare(signer: auth(BorrowValue, IssueStorageCapabilityController, SaveValue, UnpublishCapability, PublishCapability) &Account)
+```
+- **Transaction Intent**: Clearly understand what the transaction needs to do to determine the minimal sufficient authorizations. Over-authorizing can be a security risk.
+
+### Authorization by Operation Type
+- **Storage Read**: `BorrowValue`
+- **Storage Write/Save**: `SaveValue` or `Storage` (or `Mutate, Insert, Remove`)
+- **Capability Creation**: `IssueStorageCapabilityController`
+- **Capability Publishing**: `PublishCapability`
+- **Capability Unpublishing**: `UnpublishCapability`
+
+## Deployment Verification Protocol
+After each contract deployment:
+
+1. **Verify Deployment Success**: Check CLI output for successful deployment.
+2. **Test Contract Access**: Create verification script (or use frontend) to test contract members.
+3. **Validate Public Members**: Ensure paths (e.g., `CollectionStoragePath`) and functions are accessible and have the expected signatures as per the *deployed* contract.
+4. **Function Signature Check**: Verify function signatures match expectations.
+
+### Verification Script Template
+```cadence
+import ContractName from 0xADDRESS
+
+pub fun main(): {String: String} {
+    let result: {String: String} = {}
+    
+    // Test each critical member
+    do {
+        let path = ContractName.CollectionStoragePath
+        result["CollectionStoragePath"] = "OK"
+    } catch {
+        result["CollectionStoragePath"] = "MISSING or Inaccessible"
+    }
+    // Add checks for other public members and function signatures if possible via scripts
+    return result
+}
+```
+
+## Error Resolution Strategy
+- **Syntax Errors**: Check Cadence language reference for correct type syntax.
+- **Interface Errors**: Compare against standard NFT contract implementations.
+- **Deployment Errors**: Verify `flow.json` configuration, account setup, and FCL config.
+- **Type Errors**: Reference official examples for proper resource type usage.
+- **Authorization Errors**: Add missing or correct `auth` capabilities in the transaction `prepare()` function. Verify signer has these capabilities.
+- **Unknown Member Errors**: Verify contract deployment, check that the member is public in the *deployed* contract, and ensure frontend FCL is configured with the correct contract address and network.
+- **"transaction failed to decode"**: Often due to FCL configuration issues (network mismatch, incorrect address for imports) or transaction syntax errors.
+- **Computation Limit Exceeded**: Optimize Cadence code (see "Optimizing for Computation Limits"), reduce transaction scope, or process in batches.
+- **FCL Errors**: Use browser developer tools (console, network tab) to inspect FCL requests and responses. Check FCL configuration (`accessNode.api`, `discovery.wallet`).
+
+## Frontend (FCL) Integration Best Practices
+- **Network Configuration**: Ensure frontend FCL configuration (`config.js` or equivalent) explicitly sets the correct `accessNode.api` and `discovery.wallet` for the target network (emulator, testnet, mainnet). Mismatches are a common source of errors.
+  ```javascript
+  // Example config.js for Testnet
+  fcl.config({
+    "app.detail.title": "My Flow App",
+    "app.detail.icon": "https://placekitten.com/g/200/200",
+    "accessNode.api": "https://rest-testnet.onflow.org", // Testnet
+    "discovery.wallet": "https://fcl-discovery.onflow.org/testnet/authn" // Testnet
+    // For Emulator:
+    // "accessNode.api": "http://localhost:8888",
+    // "discovery.wallet": "http://localhost:8701/fcl/authn", // If using dev-wallet
+  });
+  ```
+- **Contract Address Management**: Store contract addresses in a centralized place (e.g., environment variables, config file) and ensure the frontend uses the correct addresses for the active network.
+- **Dynamic Imports**: Use FCL's ability to replace import placeholders in Cadence code with actual addresses from your configuration.
+  ```javascript
+  // In your transaction/script Cadence code:
+  // import MyContract from 0xMyContractPlaceholder
+  
+  // When sending transaction with FCL:
+  // fcl.mutate({
+  //   cadence: `...`,
+  //   args: (...) => [...],
+  //   proposer: ...,
+  //   payer: ...,
+  //   authorizations: [...],
+  //   limit: 9999,
+  //   replace: {
+  //     "0xMyContractPlaceholder": process.env.NEXT_PUBLIC_MY_CONTRACT_ADDRESS 
+  //   }
+  // });
+  ```
+- **User Authentication**: Handle `fcl.currentUser` state changes correctly to update UI (show/hide login buttons, display user address).
+- **Transaction Lifecycle UI**:
+    - Provide clear visual feedback to the user during all stages of a transaction (Sending, Pending, Sealed, Error).
+    - Use loading indicators.
+    - Display success and error messages clearly.
+    - Prevent users from submitting multiple identical transactions.
+- **Modal Management (UI/UX)**:
+    - Ensure modals (e.g., for tutorials, transaction status) have appropriate z-index to appear above other content.
+    - Provide clear ways to close modals (e.g., "X" button, Escape key).
+    - Persist "seen" state for one-time modals (like tutorials) using `localStorage`.
+
+## Code Quality Standards
+- Follow established patterns from official Flow core contracts and documentation.
+- Implement all required standard interfaces completely.
+- Use consistent naming conventions (prefer official Flow patterns).
+- Structure code according to standard NFT patterns from Flow documentation.
+- Test thoroughly on emulator before testnet deployment.
+- Always include complete and correct authorization capabilities in transactions.
+- Ensure frontend FCL configuration is robust and network-aware.
+
+## When to Reference Documentation
+- **Always** when implementing NFT contracts from scratch.
+- When encountering unfamiliar Cadence syntax errors.
+- Before deploying to testnet (verify configuration, including FCL).
+- When adding new features to existing contracts or frontend interactions.
+- When debugging complex type system errors, FCL issues, or authorization/capability errors.
+- When unsure about standard interface implementations or FCL best practices.
+
+This workflow emphasizes learning from and following official Flow patterns rather than inventing custom solutions.
+
+## Optimizing for Computation Limits (Gas Fees)
+- **Identify Costly Operations**: Operations within loops that are executed frequently (e.g., 250 times per simulated day) are prime candidates for optimization. String parsing (`String.split()`) and complex calculations are particularly expensive.
+- **Minimize Operations in Loops**: If a value is constant throughout a loop (e.g., for all steps within a simulated day), calculate or parse it once outside the loop.
+- **Accumulative Logic**: For evolutionary systems or processes that occur over many steps, calculate the *accumulated effect* of those steps in a single, efficient function rather than iterating through each step individually. This drastically reduces computation.
+  ```cadence
+  // Instead of this (costly):
+  // var i = 0
+  // while i < 250 {
+  //     complexCalculation(seeds[i]) 
+  //     i = i + 1
+  // }
+  
+  // Do this (efficient):
+  // calculateAccumulatedEffectFor250Steps(seeds)
+  ```
+- **Remove or Reduce Logging**: `log()` statements, especially those involving string concatenations, are very expensive. Remove them from contracts, particularly from functions called frequently or within loops. Use events for on-chain history if needed.
+- **Process in Chunks**: If a large backlog of operations needs to be processed (e.g., many days of evolution), design transactions to process these in smaller, manageable chunks to stay within computation limits. The contract should gracefully handle partial updates and resume from where it left off.
+- **Profile and Test**: Use testnet to profile transactions that might be computationally intensive. If they hit limits, refactor the contract logic or the transaction's scope.
+
+## Optimizing Repetitive Processes: Granular vs. Periodic vs. Accumulative Logic
+Many on-chain systems involve processes that notionally occur over many small, discrete intervals (e.g., steps, ticks, turns, minutes). Directly simulating each interval can be computationally prohibitive. Here's a breakdown of approaches:
+
+- **Granular Iterative Processing (High Fidelity, Potentially High Cost)**:
+    - **Description**: Simulating every single discrete interval of a process. This provides the highest realism or accuracy as each interval can have unique inputs or random influences.
+    - **Challenge**: Can be computationally expensive if the logic per interval is complex or the number of intervals is very large, potentially exceeding transaction limits.
+
+- **Simplified Periodic Processing (Low Cost, Lower Fidelity)**:
+    - **Description**: Processing the logic only once per larger, fixed period (e.g., once per "day" if a day contains many smaller "steps", or once per "epoch").
+    - **Benefit**: Very efficient.
+    - **Drawback**: May lose the nuanced effects, accumulated randomness, or fine-grained changes that would occur across the individual discrete intervals.
+
+- **Accumulative Periodic Processing (Recommended Balance: Efficiency with Outcome Fidelity)**:
+    - **Description**: Calculate the *total net effect* of all discrete intervals that would occur within a larger period, ideally in a single, efficient operation or a condensed loop.
+    - **Goal**: To maintain the *intended outcome* of granular processing with significantly improved computational efficiency. This often involves mathematical aggregation, statistical modeling of the aggregate effect, or a more optimized simulation of the combined steps.
+    - **Benefit**: Strikes a balance by reducing computation while attempting to preserve the essential results of a more granular simulation.
+
+The following Cadence code illustrates the 'Accumulative Periodic Processing' principle within an NFT evolution context. The `NFTContract` (acting as a 'MainLogicContract') manages evolution over time, and individual `TraitModule` components (acting as 'SubProcessModules') calculate their changes accumulatively.
+  ```cadence
+  // In NFT Contract (MainLogicContract)
+  access(all) fun evolve(simulatedSecondsPerPeriod: UFix64) { // Renamed simulatedSecondsPerDay for generality
+      let DISCRETE_INTERVALS_PER_PERIOD: UInt64 = 250 // e.g., STEPS_PER_DAY
+      let elapsedIntervals = calculateElapsedIntervals(simulatedSecondsPerPeriod) // Based on real time
+
+      let completePeriods = elapsedIntervals / DISCRETE_INTERVALS_PER_PERIOD
+      let partialIntervals = elapsedIntervals % DISCRETE_INTERVALS_PER_PERIOD
+
+      // Process complete periods in bulk
+      var i: UInt64 = 0
+      while i < completePeriods {
+          // 'getPeriodSeeds' replaces 'generateDailySeeds', 'currentPeriod' replaces 'edadDiasCompletos'
+          let periodSeeds = self.getPeriodSeeds(self.currentPeriod + UFix64(i)) 
+          for module in self.modules { // 'modules' are SubProcessModules
+              module.processAccumulative(seeds: periodSeeds, intervals: DISCRETE_INTERVALS_PER_PERIOD) // 'processAccumulative' replaces 'evolveAccumulative', 'intervals' replaces 'steps'
+          }
+          // ... update global state for a full period (e.g., age, points) ...
+          self.currentPeriod = self.currentPeriod + 1.0 // Example update
+          i = i + 1
+      }
+
+      // Process remaining partial intervals
+      if partialIntervals > 0 {
+          let currentPeriodSeeds = self.getPeriodSeeds(self.currentPeriod + UFix64(completePeriods))
+          for module in self.modules {
+              module.processAccumulative(seeds: currentPeriodSeeds, intervals: partialIntervals)
+          }
+          // ... update global state for partial period ...
+      }
+      // ... update timestamps ...
+  }
+
+  // In Trait Module (SubProcessModule)
+  access(all) fun processAccumulative(seeds: [UInt64], intervals: UInt64): String { // 'processAccumulative' replaces 'evolveAccumulative', 'intervals' replaces 'steps'
+      var totalChange: UFix64 = 0.0
+      var intervalSeed = seeds[0] // Or a specific seed for this sub-process
+
+      var i: UInt64 = 0
+      while i < intervals {
+          // Generate interval-specific random (maintaining granularity outcome)
+          intervalSeed = (intervalSeed * 1664525 + 1013904223) % 4294967296
+          let randomFactor = UFix64(intervalSeed % 1000) / 999.0 // Example random influence
+          // 'baseRateOfChange' replaces 'baseEvolutionRate'
+          totalChange = totalChange + (randomFactor * baseRateOfChange) 
+          i = i + 1
+      }
+      self.traitValue = self.traitValue + totalChange // Update the specific value for this sub-process
+      // ... clamp value if necessary and return status/result ...
+      return "Processed"
+  }
+  ```
+
+## Contract Updates & Deployment
+- **Immutable Struct Changes**: If a contract's resource or struct definition changes (e.g., adding/removing fields), Flow CLI cannot perform a simple `--update`. This is treated as a breaking change.
+  - **Workaround for Deployed Contracts**: If `init()` cannot be changed, modify existing functions to set default values for new fields if they are not already initialized, or adjust logic to handle their potential absence.
+- **Versioning Strategy**: To handle breaking changes, deploy a new version of the contract (e.g., `MyContractV2.cdc`). This may require a migration strategy for existing data if applicable.
+- **`flow.json` Management**: Ensure `flow.json` correctly lists all contracts and their paths. When versioning contracts, add the new version alongside the old one if both need to be temporarily active, or replace the old entry if it's a direct upgrade.
+
+## Debugging Iteration Cycle
+- **Deploy Incrementally**: When developing complex systems with multiple contracts, deploy and test incrementally. Deploy core contracts first, then modules one by one.
+- **Use Testnet Frequently**: Deploy to testnet often to catch issues related to gas limits, state, and inter-contract calls that might not be apparent on the emulator.
+- **Targeted Error Analysis**: Examine the full error output. Flow errors often provide a stack trace pointing to the exact line in the contract and then the transaction line that triggered it.
+- **Smallest Test Case**: When a transaction fails (e.g., due to computation limits or FCL issues), try to reduce the scope of the transaction (e.g., fewer steps, simpler arguments, minimal Cadence code) to isolate the problematic code path.
+- **Correct Signer and Network**: Double-check that transactions and scripts are using the correct `--network` (testnet, emulator, mainnet) and `--signer` (the account name from `flow.json`). Mismatches, especially using an emulator account address on testnet, will cause errors.
+- **Console Logging**: Use `console.log` in JavaScript (frontend) and `log()` in Cadence (sparingly, due to gas costs in contracts) to trace execution flow and variable states.
+- **Hardcoded Values in Transactions**: Be mindful of hardcoded values in transaction scripts (e.g., `lifespanDays: 10.0`). While useful for testing, these should ideally be arguments or derived from contract state for flexibility in production.
+
+## Concise yet Complete In-Code Documentation (Docstrings)
+- **Statement**: Document all public declarations (contracts, resources, structs, interfaces, functions, events, and important fields) using Cadence docstrings. Explain the purpose, parameters, return values, and any relevant behavior or side effects.
+- **Example**:
+  ```cadence
+  access(all) contract DocumentedContract {
+
+      /// The unique ID for the next item to be created.
+      access(all) var nextItemID: UInt64
+
+      /// Event emitted when a new item is created.
+      /// - itemID: The ID of the new item.
+      /// - metadata: The metadata associated with the item.
+      access(all) event ItemCreated(itemID: UInt64, metadata: String)
+
+      init() {
+          self.nextItemID = 1
+      }
+
+      /// Creates a new item with the provided metadata.
+      /// Increments `nextItemID`.
+      /// Emits an `ItemCreated` event.
+      ///
+      /// - Parameter metadata: The metadata for the new item.
+      /// - Returns: The resource of the newly created Item.
+      ///
+      access(all) fun createItem(metadata: String): @Item {
+          let newItem <- create Item(id: self.nextItemID, metadata: metadata)
+          emit ItemCreated(itemID: self.nextItemID, metadata: metadata)
+          self.nextItemID = self.nextItemID + 1
+          return <-newItem
+      }
+
+      access(all) resource Item {
+          access(all) let id: UInt64
+          access(all) let metadata: String
+          init(id: UInt64, metadata: String) {
+              self.id = id
+              self.metadata = metadata
+          }
+      }
+  }
+  ```
+- **Why**: Enhances code understanding, facilitates maintenance, and improves collaboration.
+
+## Modularity for Evolution
+- **Statement**: Design contracts with modularity, separating functionalities into distinct modules/contracts where appropriate. This aligns with the constraint of not modifying `init()` of deployed contracts and the practice of introducing new versions of modules (e.g., `PersonalityModuleV2`).
+- **Conceptual Example (aligns with existing `EvolvingCreatureNFT` and `PersonalityModuleV2` memory):
+    *   **Core Contract** (e.g., `EvolvingCreatureNFT`): Manages the core NFT lifecycle (ID, ownership).
+    *   **Separate Modules** (e.g., `VisualModule`, `StatsModule`, `PersonalityModuleV2`): Each handles a specific aspect. The core contract can hold references or methods to interact with these modules.
+- **Why**: Facilitates updates and the addition of new functionality without altering the deployed base contract, which is critical given that `init()` cannot be modified. This supports the evolution of complex systems over time and is reinforced by existing project practices such as `PersonalityModuleV2` and the immutability of `init()` in deployed `EvolvingCreatureNFT` contract.
+
+## Comprehensive Testnet Validation Protocol Before Mainnet
+- **Statement**: Before any Mainnet deployment, conduct a rigorous end-to-end validation on Testnet. This protocol should go beyond basic functionality tests and include:
+    1.  Replication of all key user flows and edge cases.
+    2.  Interaction with other relevant contracts deployed on Testnet (if applicable, e.g., token standards, oracle services).
+    3.  Testing under simulated conditions of expected load (e.g., batch minting scripts, concurrent transactions if testable).
+    4.  Verification of all contract-emitted events, their expected payloads, and indexing by any off-chain services.
+    5.  Security audit or peer review, focusing on Testnet-deployed code and potential attack vectors.
+    6.  Confirmation of correct FCL integration and UI/UX behavior with Testnet contracts across different browsers/devices.
+    7.  A detailed, step-by-step deployment checklist for Mainnet, including `flow.json` updates for Mainnet addresses, signer account readiness, and rollback plans.
+    8.  Ensure a separate, clean, and stable Testnet environment for these validation cycles if the primary Testnet is too volatile or cluttered.
+- **Why**: Testnet is the closest environment to Mainnet. Comprehensive validation here is crucial for catching subtle bugs, integration issues, performance bottlenecks, gas limit surprises, and security oversights that might not be apparent during emulator testing. This minimizes risks associated with Mainnet deployment.
