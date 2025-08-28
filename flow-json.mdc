@@ -1,0 +1,820 @@
+---
+alwaysApply: true
+---
+# Flow.json & CLI Complete Guide
+
+## Overview
+
+This comprehensive guide covers everything you need to know about `flow.json` configuration, Flow CLI workflow, and project management. The `flow.json` file is the central configuration file for Flow projects that tells the Flow CLI how to interact with networks, manage accounts, deploy contracts, and organize your project structure.
+
+## Project Initialization
+
+### Start Any New Flow Project
+
+```bash
+flow init
+```
+
+This creates:
+- Basic `flow.json` configuration
+- Default networks (emulator, testnet, mainnet)
+- Emulator service account
+- Cadence directory structure
+
+### Project Structure After Init
+
+```
+my-project/
+├── flow.json
+├── emulator-account.pkey
+└── cadence/
+    ├── contracts/
+    ├── scripts/
+    ├── transactions/
+    └── tests/
+```
+
+## `flow.json` Structure Overview
+
+### Core Sections
+
+A basic `flow.json` contains these main sections:
+- **`networks`**: Defines Flow networks (emulator, testnet, mainnet)
+- **`accounts`**: Defines named accounts, their addresses, and private keys. Critical for deployment and signing.
+- **`contracts`**: Lists contracts in the project, their source files, and network-specific aliases (which contract name maps to which address on a given network).
+- **`dependencies`**: External contract dependencies with hash verification
+- **`deployments`**: Records which contracts are deployed to which accounts on specific networks.
+- **`emulators`**: Custom emulator settings (optional)
+
+## Networks Configuration
+
+### Basic Networks Setup
+
+```json
+"networks": {
+  "emulator": "127.0.0.1:3569",
+  "testnet": "access.devnet.nodes.onflow.org:9000",
+  "mainnet": "access.mainnet.nodes.onflow.org:9000"
+}
+```
+
+### Custom Network Names
+
+You can create custom network names for different environments:
+
+```json
+"networks": {
+  "emulator": "127.0.0.1:3569",
+  "testing": "127.0.0.1:3569",
+  "testnet": "access.devnet.nodes.onflow.org:9000",
+  "mainnet": "access.mainnet.nodes.onflow.org:9000"
+}
+```
+
+### Advanced Network Configuration with Security
+
+```json
+"networks": {
+  "testnetSecure": {
+    "host": "access-001.devnet30.nodes.onflow.org:9001",
+    "key": "ba69f7d2e82b9edf25b103c195cd371cf0cc047ef8884a9bbe331e62982d46daeebf836f7445a2ac16741013b192959d8ad26998aff12f2adc67a99e1eb2988d"
+  }
+}
+```
+
+## Account Configuration (`accounts` section)
+
+### Simple Key Format
+
+```json
+"accounts": {
+  "my-account": {
+    "address": "f8d6e0586b0a20c7",
+    "key": "ae1b44c0f5e8f6992ef2348898a35e50a8b0b9684000da8b1dade1b3bcd6ebee"
+  }
+}
+```
+
+### File-Based Key Storage (Recommended for Production)
+
+Store private keys in separate files for enhanced security:
+
+```json
+"accounts": {
+  "emulator-account": {
+    "address": "f8d6e0586b0a20c7",
+    "key": {
+      "type": "file",
+      "location": "emulator-account.pkey"
+    }
+  },
+  "testnet-account": {
+    "address": "544ad93e4effc077",
+    "key": {
+      "type": "file",
+      "location": "tt.pkey"
+    }
+  }
+}
+```
+
+### Environment Variable Keys
+
+Use environment variables for sensitive data:
+
+```json
+"accounts": {
+  "production-account": {
+    "address": "1234567890abcdef",
+    "key": "${FLOW_PRIVATE_KEY}"
+  }
+}
+```
+
+### Advanced Account Configuration
+
+```json
+"accounts": {
+  "multi-sig-account": {
+    "address": "1234567890abcdef",
+    "key": {
+      "type": "file",
+      "location": "/secure/keys/multi-sig.key",
+      "sigAlgo": "ECDSA_P256",
+      "hashAlgo": "SHA3_256"
+    }
+  }
+}
+```
+
+### Account Configuration Best Practices
+
+- **Account Name Accuracy**: Double-check account names for typos (e.g., `testnet-deployer` not `tesnet-deployer`). This name is used with `flow ... --signer <account-name>`.
+- **Key File Paths**: Ensure key file paths (e.g., `testnet-deployer.pkey`) are correct relative to `flow.json` and match the account names.
+- **Address Consistency**: 
+    - The `address` field for an account in `flow.json` MUST be the actual on-chain address for that account on the target network.
+    - This address is used by FCL if configured to resolve account names locally.
+- **Private Keys**: Securely manage private key files. Do not commit them to public repositories if they control real assets. Use `.gitignore`.
+
+## Contract Configuration (`contracts` section)
+
+### Basic Contract Setup
+
+```json
+"contracts": {
+  "ExampleNFT": {
+    "source": "cadence/contracts/ExampleNFT.cdc",
+    "aliases": {
+      "emulator": "f8d6e0586b0a20c7",
+      "testnet": "544ad93e4effc077",
+      "testing": "0000000000000007"
+    }
+  }
+}
+```
+
+### Key Configuration Elements
+
+- **`source`**: Path to your contract file
+- **`aliases`**: Network-specific contract addresses
+- **Network names**: `emulator`, `testnet`, `mainnet`
+
+### Contract Registration and Aliasing Best Practices
+
+- **Pre-deployment Registration**: ALWAYS add new contracts to the `contracts` section of `flow.json` *before* running `flow project deploy`.
+- **Source Path Accuracy**: Ensure contract source paths (`MyContract: ../cadence/contracts/MyContract.cdc`) correctly point to the actual `.cdc` file locations relative to `flow.json`.
+- **Network-specific Aliases**: 
+    - An alias in `contracts` (e.g., `MyProjectNFT: 0xEMULATOR_ADDRESS`) allows you to `import MyProjectNFT from "./MyProjectNFT"` and have the CLI replace it during deployment to that emulator account.
+    - For imports from *other* projects (like standard contracts), use their direct address or an FCL-managed alias.
+
+### Standard Contract Aliases and FCL Integration
+
+- **Purpose**: Aliases in `flow.json` (within the `contracts` section) tell the Flow CLI where to find a contract *if it were deployed by an account defined in this `flow.json`*. 
+- **FCL Configuration is Key for Imports**: For frontend FCL to correctly resolve `import MyContract from "MyContract"` or `import MyContract from 0xALIAS`, the FCL configuration (e.g., in `config.js`) must map these placeholder names/aliases to actual on-chain addresses for the current network.
+
+  ```javascript
+  // Frontend FCL config.js example
+  fcl.config({
+    // ... other FCL settings ...
+    "flow.network": "testnet",
+    "0xNonFungibleToken": "0x631e88ae7f1d7c20", // Testnet NonFungibleToken address
+    "0xMetadataViews": "0x631e88ae7f1d7c20",    // Testnet MetadataViews address
+    "0xMyProjectNFT": "0xabcdef1234567890"     // Your project's deployed contract address on Testnet
+  });
+  ```
+- **Official Addresses**: Always verify and use the latest official addresses for standard contracts on the target network.
+    - Testnet: `NonFungibleToken: 0x631e88ae7f1d7c20`, `MetadataViews: 0x631e88ae7f1d7c20`, `FungibleToken: 0x9a0766d93b6608b7`
+    - Emulator: Addresses are usually fixed based on the emulator's initial accounts (e.g., `0xf8d6e0586b0a20c7` for `NonFungibleToken` on default emulator setup).
+
+## Dependencies Configuration
+
+### Overview
+
+The `dependencies` section manages external contract dependencies with hash verification for security. This is crucial for using official Flow contracts and third-party contracts safely.
+
+### Basic Dependencies Structure
+
+```json
+"dependencies": {
+  "Burner": {
+    "source": "mainnet://f233dcee88fe0abe.Burner",
+    "hash": "71af18e227984cd434a3ad00bb2f3618b76482842bae920ee55662c37c8bf331",
+    "aliases": {
+      "emulator": "f8d6e0586b0a20c7",
+      "mainnet": "f233dcee88fe0abe",
+      "testnet": "9a0766d93b6608b7"
+    }
+  }
+}
+```
+
+### Core Flow Dependencies
+
+```json
+"dependencies": {
+  "FlowToken": {
+    "source": "mainnet://1654653399040a61.FlowToken",
+    "hash": "cefb25fd19d9fc80ce02896267eb6157a6b0df7b1935caa8641421fe34c0e67a",
+    "aliases": {
+      "emulator": "0ae53cb6e3f42a79",
+      "mainnet": "1654653399040a61",
+      "testnet": "7e60df042a9c0868"
+    }
+  },
+  "FungibleToken": {
+    "source": "mainnet://f233dcee88fe0abe.FungibleToken",
+    "hash": "23c1159cf99b2b039b6b868d782d57ae39b8d784045d81597f100a4782f0285b",
+    "aliases": {
+      "emulator": "ee82856bf20e2aa6",
+      "mainnet": "f233dcee88fe0abe",
+      "testnet": "9a0766d93b6608b7"
+    }
+  },
+  "NonFungibleToken": {
+    "source": "mainnet://1d7e57aa55817448.NonFungibleToken",
+    "hash": "b63f10e00d1a814492822652dac7c0574428a200e4c26cb3c832c4829e2778f0",
+    "aliases": {
+      "emulator": "f8d6e0586b0a20c7",
+      "mainnet": "1d7e57aa55817448",
+      "testnet": "631e88ae7f1d7c20"
+    }
+  }
+}
+```
+
+### Dependencies Key Elements
+
+- **`source`**: Mainnet source reference (e.g., `mainnet://address.ContractName`)
+- **`hash`**: Contract hash for verification and security
+- **`aliases`**: Network-specific contract addresses
+- **Security**: Hash verification ensures contract integrity
+
+## Deployment Configuration (`deployments` section)
+
+### Basic Deployment Structure
+
+```json
+"deployments": {
+  "emulator": {
+    "emulator-account": ["MyContract", "AnotherContract"]
+  },
+  "testnet": {
+    "my-testnet-account": ["MyContract"]
+  }
+}
+```
+
+### Deployment Configuration Best Practices
+
+- **Accurate Signer**: The `account` specified for a deployment MUST be a named account from your `accounts` section with the correct keys for the target network.
+- **Contract List**: Ensure all contracts intended for deployment are listed with their correct names (matching names in the `contracts` section).
+- **Network Specificity**: Deployments are network-specific. A deployment to `emulator` does not affect `testnet`.
+
+### Multi-Environment Deployment Setup
+
+```json
+"deployments": {
+  "emulator": {
+    "emulator-account": ["MyContract"]
+  },
+  "testnet": {
+    "testnet-account": ["MyContract"]
+  },
+  "mainnet": {
+    "mainnet-account": ["MyContract"]
+  }
+}
+```
+
+## Configuration Management
+
+### Add Configuration Items
+
+Instead of editing `flow.json` manually, use CLI commands:
+
+```bash
+# Add an account
+flow config add account
+
+# Add a contract
+flow config add contract
+
+# Add a deployment
+flow config add deployment
+```
+
+### Remove Configuration
+
+```bash
+# Remove configuration items
+flow config remove account my-account
+flow config remove contract my-contract
+```
+
+### Configuration Only Initialization
+
+If you only want to generate the `flow.json` file without creating the full project structure:
+
+```bash
+flow init --config-only
+```
+
+### Global Configuration
+
+Create a global `flow.json` file that applies to all Flow projects:
+
+```bash
+flow init --global
+```
+
+**Global configuration locations:**
+- **macOS/Linux:** `~/flow.json`
+- **Windows:** `C:\\Users\\$USER\\flow.json`
+
+## Development Workflow
+
+### 1. Start Emulator
+
+```bash
+flow emulator
+# Starts local development environment
+```
+
+### 2. Deploy Contracts
+
+```bash
+flow project deploy
+# Deploys all contracts based on flow.json configuration
+```
+
+### 3. Run Scripts
+
+```bash
+flow scripts execute <script-name>
+# Execute Cadence scripts
+```
+
+### 4. Send Transactions
+
+```bash
+flow transactions send <transaction-file>
+# Send Cadence transactions
+```
+
+## Network Management
+
+### Switch Networks
+
+```bash
+flow config set env <network-name>
+# Set active network (emulator, testnet, mainnet)
+```
+
+### Account Creation
+
+```bash
+flow accounts create
+# Create new account on active network
+```
+
+### Key Management
+
+```bash
+flow keys generate
+# Generate new key pair
+```
+
+## Testing and Validation
+
+### Run Tests
+
+```bash
+flow test
+# Run all Cadence tests
+```
+
+### Lint Code
+
+```bash
+flow cadence lint
+# Check Cadence code quality
+```
+
+### Validate Configuration
+
+```bash
+flow config validate
+# Verify flow.json is correct
+```
+
+## Deployment Best Practices
+
+### Deployment Workflow
+
+- **Emulator First**: Always use `flow project deploy --network=emulator` (or just `flow project deploy` if emulator is default) to test contract logic and deployment configuration locally.
+- **Testnet Deployment**: After successful emulator deployment and testing, use `flow project deploy --network=testnet --signer <your-testnet-account-name>`.
+- **Sufficient FLOW**: Ensure the deploying account has enough FLOW tokens for deployment fees on testnet/mainnet.
+- **`--update` Flag**: Use `flow project deploy --network=<network> --update` to update existing contracts. Note that changes to `init()` or resource/struct field definitions are often breaking and may require deploying a new contract version instead of a simple update.
+
+### 1. Test Locally
+
+```bash
+flow emulator
+flow project deploy
+flow test
+```
+
+### 2. Deploy to Testnet
+
+```bash
+flow config set env testnet
+flow project deploy
+```
+
+### 3. Deploy to Mainnet
+
+```bash
+flow config set env mainnet
+flow project deploy
+```
+
+## Strict Multi-Network Consistency Management
+
+### Multi-Network Configuration Strategy
+
+Maintain distinct and accurate configurations within `flow.json` for each network environment (emulator, testnet, mainnet). This includes defining separate aliases for contracts deployed to different networks and ensuring account addresses are correct for each environment. Regularly audit these configurations, especially contract addresses and import paths, before switching networks or performing deployments.
+
+### Example Multi-Network Structure
+
+```json
+{
+  "contracts": {
+    "MyNFT_Emulator": "./cadence/contracts/MyNFT.cdc",
+    "MyNFT_Testnet": "./cadence/contracts/MyNFT.cdc"
+  },
+  "deployments": {
+    "emulator": {
+      "emulator-account": ["MyNFT_Emulator"]
+    },
+    "testnet": {
+      "testnet-account": ["MyNFT_Testnet"]
+    }
+  },
+  "networks": {
+    "emulator": "127.0.0.1:3569",
+    "testnet": "access.devnet.nodes.onflow.org:9000"
+  },
+  "accounts": {
+    "emulator-account": {
+      "address": "0xf8d6e0586b0a20c", // Example emulator address
+      "key": "..."
+    },
+    "testnet-account": {
+      "address": "0xYourTestnetAccountAddress", // Example testnet address
+      "key": "..."
+    }
+  }
+}
+```
+
+**Benefits**: Prevents common deployment errors, ensures transactions interact with the correct contract instances on the intended network, and simplifies switching between development environments. Using network-specific aliases (e.g., `MyNFT_Emulator`, `MyNFT_Testnet` aliasing the same source file but deployed differently) can make scripts more robust.
+
+## Frontend Integration (FCL)
+
+### Synchronized Configuration
+
+The contract addresses and network information used by FCL in the frontend *must* align with your `flow.json` and actual on-chain deployment addresses for the target network.
+
+### Environment Variables
+
+Use environment variables (e.g., `.env` files for Next.js/React) to manage network-specific contract addresses and FCL settings for different environments (development, staging, production).
+
+### FCL Configuration Example
+
+```javascript
+// Frontend FCL config.js example
+import { config } from '@onflow/fcl';
+import flowJSON from '../flow.json';
+
+export const flowConfig = {
+  'flow.network': 'testnet',
+  'accessNode.api': 'https://rest-testnet.onflow.org',
+  'discovery.wallet': 'https://fcl-discovery.onflow.org/testnet/authn',
+  'app.detail.title': 'My Flow App',
+  'app.detail.icon': 'https://myapp.com/icon.png',
+  'app.detail.description': 'A Flow blockchain application',
+  'app.detail.url': 'https://myapp.com'
+};
+
+// Load flow.json configuration
+config(flowConfig).load({ flowJSON });
+```
+
+## Common Errors & Prevention
+
+### Configuration Errors
+
+- **Typos**: Carefully check for typos in account names, file paths, contract names, and addresses.
+- **Address Mismatches**: Ensure contract addresses are consistent between `flow.json` sections, your Cadence `import` statements, and your frontend FCL configuration for the target network.
+- **Incorrect Signer/Network for CLI**: 
+    - When running `flow transactions send ... --signer <name> --network <network>`, ensure `<name>` is correctly defined in `flow.json` for that `<network>` and has the right address/keys.
+    - A common error is using an emulator signer name/address when targeting testnet, or vice-versa.
+
+### Import Resolution Errors
+
+- **"failed to get contract" / "failed to resolve import"**: 
+    - For CLI: The contract alias might be missing or incorrect in `flow.json` for the current network, or the source file path is wrong.
+    - For FCL (frontend): The FCL config is missing the address mapping for the import placeholder, or the address is wrong for the target network.
+- **Permission Denied (Key Files)**: Ensure key files are readable by the CLI.
+
+### Configuration Already Exists
+
+If `flow.json` already exists, you'll see:
+```
+❌ Command Error: configuration already exists at: flow.json
+```
+
+**Solutions:**
+
+- Delete existing `flow.json` file first
+- Initialize in different directory
+- Use `--config-only` flag
+
+### Common Configuration Issues
+
+- Use `flow config validate` to check for errors
+- Ensure all referenced accounts exist
+- Verify contract source paths are correct
+- Check network connectivity
+
+### Deployment Issues
+
+- Check network connectivity
+- Verify account has sufficient FLOW for deployment
+- Ensure contracts compile without errors
+- Validate all dependencies are available
+
+## Dependency Management
+
+### Installing Dependencies
+
+```bash
+# Install all dependencies from flow.json
+flow dependencies install
+
+# Install dependencies for specific network
+flow dependencies install --network <network>
+
+# Update dependencies to latest versions
+flow dependencies update
+
+# List all dependencies
+flow dependencies list
+
+# Add new dependency interactively
+flow dependencies add
+
+# Remove specific dependency
+flow dependencies remove <name>
+```
+
+## Advanced Configuration
+
+### Custom Emulator Settings
+
+```json
+"emulators": {
+  "default": {
+    "port": 3569,
+    "serviceAccount": "emulator-account",
+    "db": "./flowdb",
+    "blockTime": 1,
+    "flags": "--enable-ping"
+  }
+}
+```
+
+### Environment-Based Configuration
+
+```bash
+# Use environment variables for flexible configuration
+export FLOW_NETWORK=testnet
+export FLOW_ACCESS_NODE=https://rest-testnet.onflow.org
+
+# Update configuration based on environment
+flow config set env $FLOW_NETWORK
+```
+
+## Complete flow.json Example
+
+### Real-World Configuration
+
+Here's a complete `flow.json` example from a production project:
+
+```json
+{
+  "contracts": {
+    "ExampleNFT": {
+      "source": "cadence/contracts/ExampleNFT.cdc",
+      "aliases": {
+        "emulator": "f8d6e0586b0a20c7",
+        "testnet": "544ad93e4effc077",
+        "testing": "0000000000000007"
+      }
+    }
+  },
+  "dependencies": {
+    "Burner": {
+      "source": "mainnet://f233dcee88fe0abe.Burner",
+      "hash": "71af18e227984cd434a3ad00bb2f3618b76482842bae920ee55662c37c8bf331",
+      "aliases": {
+        "emulator": "f8d6e0586b0a20c7",
+        "mainnet": "f233dcee88fe0abe",
+        "testnet": "9a0766d93b6608b7"
+      }
+    },
+    "CapabilityDelegator": {
+      "source": "mainnet://d8a7e05a7ac670c0.CapabilityDelegator",
+      "hash": "ad3bf8671a74a836b428da7840540c0ce419349be5f6410b18546e9a9217a9d2",
+      "aliases": {
+        "mainnet": "d8a7e05a7ac670c0",
+        "testnet": "294e44e1ec6993c6"
+      }
+    }
+  },
+  "networks": {
+    "emulator": "127.0.0.1:3569",
+    "mainnet": "access.mainnet.nodes.onflow.org:9000",
+    "testing": "127.0.0.1:3569",
+    "testnet": "access.devnet.nodes.onflow.org:9000"
+  },
+  "accounts": {
+    "emulator-account": {
+      "address": "f8d6e0586b0a20c7",
+      "key": {
+        "type": "file",
+        "location": "emulator-account.pkey"
+      }
+    },
+    "testnet": {
+      "address": "544ad93e4effc077",
+      "key": {
+        "type": "file",
+        "location": "tt.pkey"
+      }
+    }
+  },
+  "deployments": {
+    "emulator": {
+      "emulator-account": [
+        "HybridCustody",
+        "CapabilityFactory",
+        "CapabilityDelegator",
+        "CapabilityFilter"
+      ]
+    },
+    "testnet": {
+      "testnet": [
+        "ExampleNFT"
+      ]
+    }
+  }
+}
+```
+
+## Best Practices Summary
+
+### 1. Use CLI Commands
+
+- Use CLI commands instead of manual editing when possible
+- This ensures proper validation and consistency
+- Easier to maintain and version control
+
+### 2. Keep Private Keys Secure
+
+- Never commit private keys to version control
+- Use file-based keys for production (recommended)
+- Use environment variables for sensitive data
+- Consider key rotation and backup strategies
+
+### 3. Use Dependencies and Aliases
+
+- Use the `dependencies` section for external contracts
+- Use aliases for core contracts to avoid redeployment
+- Maintain consistent contract addresses across networks
+- Document contract dependencies and their purposes
+
+### 4. Hash Verification
+
+- Always include hash verification for dependencies
+- Verify contract hashes before deployment
+- Use official Flow contract addresses when possible
+- Regularly update dependency hashes
+
+### 5. Test on Emulator First
+
+- Always test on emulator before deploying to testnet
+- Use different accounts for different networks
+- Backup your configuration before making major changes
+- Test dependency resolution on all networks
+
+### 6. Consistent Naming and Organization
+
+- Use descriptive account and contract names
+- Maintain consistent source paths
+- Document custom network configurations
+- Group related contracts and dependencies together
+
+### 7. Security Best Practices
+
+- Use file-based keys instead of inline keys
+- Implement proper key management and rotation
+- Monitor account permissions and capabilities
+- Use environment-specific configurations
+
+## Common Commands Reference
+
+### Project Management
+
+- `flow init` - Initialize new project with basic flow.json
+- `flow init --config-only` - Generate only flow.json without project structure
+- `flow init --global` - Create global configuration for all projects
+- `flow project deploy` - Deploy contracts
+
+### Configuration Management
+
+- `flow config add` - Add configuration items
+- `flow config remove` - Remove configuration items
+- `flow config validate` - Verify configuration is correct
+- `flow config set env` - Set active network
+
+### Development Tools
+
+- `flow emulator` - Start local development environment
+- `flow test` - Run Cadence tests
+- `flow cadence lint` - Check code quality
+- `flow scripts execute` - Execute scripts
+
+### Account Management
+
+- `flow accounts create` - Create new account
+- `flow keys generate` - Generate new key pair
+- `flow config add account` - Add account to configuration
+
+## Troubleshooting
+
+### Configuration Issues
+
+1. **Missing accounts**: Verify all referenced accounts exist in flow.json
+2. **Invalid paths**: Check contract source paths are correct
+3. **Network issues**: Verify network endpoints are accessible
+4. **Key format**: Ensure keys are in correct format (hex, PEM, etc.)
+
+### Deployment Issues
+
+1. **Contract compilation**: Ensure all contracts compile without errors
+2. **Dependencies**: Verify all contract dependencies are available
+3. **Account permissions**: Check account has required capabilities
+4. **Network status**: Verify target network is operational
+
+### Performance Issues
+
+1. **Large contracts**: Break large contracts into smaller modules
+2. **Dependency resolution**: Use contract aliases to avoid redeployment
+3. **Network selection**: Use appropriate network for development vs testing
+
+## Security Validation
+
+### Security Checks
+
+```bash
+# Validate configuration
+flow config validate
+
+# Check for exposed keys
+grep -r "0x[a-fA-F0-9]\\{64\\}" flow.json
+
+# Verify file permissions
+ls -la flow.json
+chmod 600 flow.json
+```

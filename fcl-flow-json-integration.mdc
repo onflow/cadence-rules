@@ -1,0 +1,252 @@
+---
+description: FCL (Flow Client Library) provides seamless integration with `flow.json` for managing contract imports, configuration, and React SDK setup. This approach keeps your import syntax clean and allows FCL to automatically pick the correct contract addresses based on the network.
+alwaysApply: false
+---
+# FCL Integration with flow.json
+
+## Overview
+
+FCL (Flow Client Library) provides seamless integration with `flow.json` for managing contract imports, configuration, and React SDK setup. This approach keeps your import syntax clean and allows FCL to automatically pick the correct contract addresses based on the network.
+
+## Basic FCL Configuration
+
+### Install FCL
+
+```bash
+npm install @onflow/fcl
+# or
+yarn add @onflow/fcl
+```
+
+### Import and Configure
+```typescript
+import { config } from '@onflow/fcl';
+import flowJSON from '../flow.json';
+
+config({
+  'flow.network': 'testnet', // Choose network: testnet, mainnet, emulator
+  'accessNode.api': 'https://rest-testnet.onflow.org',
+  'discovery.wallet': `https://fcl-discovery.onflow.org/testnet/authn`,
+}).load({ flowJSON });
+```
+
+## Contract Configuration in flow.json
+
+### Define Contracts with Network Aliases
+```json
+{
+  "contracts": {
+    "HelloWorld": {
+      "source": "./cadence/contracts/HelloWorld.cdc",
+      "aliases": {
+        "emulator": "0xf8d6e0586b0a20c7",
+        "testnet": "0x1cf0e2f2f715450",
+        "mainnet": "0xf8d6e0586b0a20c7"
+      }
+    },
+    "FungibleToken": {
+      "source": "./cadence/contracts/FungibleToken.cdc",
+      "aliases": {
+        "testnet": "0x9a0766d93b6608b7",
+        "mainnet": "0xf233dcee88fe0abe"
+      }
+    }
+  }
+}
+```
+
+### Key Configuration Elements
+- **`source`**: Path to your contract file
+- **`aliases`**: Network-specific contract addresses
+- **Network names**: `emulator`, `testnet`, `mainnet`
+
+## Using Contract Names in Cadence
+
+### Clean Import Syntax
+After configuring FCL with `flow.json`, use simple contract names:
+
+```cadence
+// Scripts
+import "HelloWorld"
+
+access(all) fun main(): String {
+  return HelloWorld.sayHello()
+}
+```
+
+```cadence
+// Transactions
+import "HelloWorld"
+import "FungibleToken"
+
+transaction {
+  execute {
+    // FCL automatically replaces "HelloWorld" with correct address
+    HelloWorld.doSomething()
+  }
+}
+```
+
+### No More Hardcoded Addresses
+- ❌ **Before**: `import 0x1cf0e2f2f715450.HelloWorld`
+- ✅ **After**: `import "HelloWorld"`
+
+## React SDK Integration
+
+### Wrap Your App with FlowProvider
+```typescript
+import { FlowProvider } from '@onflow/react-sdk';
+import { flowConfig } from './config/flowConfig';
+
+function App() {
+  return (
+    <FlowProvider config={flowConfig}>
+      <YourAppComponents />
+    </FlowProvider>
+  );
+}
+```
+
+### Flow Configuration File
+```typescript
+// config/flowConfig.ts
+import { config } from '@onflow/fcl';
+import flowJSON from '../flow.json';
+
+export const flowConfig = {
+  'flow.network': 'testnet',
+  'accessNode.api': 'https://rest-testnet.onflow.org',
+  'discovery.wallet': 'https://fcl-discovery.onflow.org/testnet/authn',
+  'app.detail.title': 'My Flow App',
+  'app.detail.icon': 'https://myapp.com/icon.png',
+  'app.detail.description': 'A Flow blockchain application',
+  'app.detail.url': 'https://myapp.com'
+};
+
+// Load flow.json configuration
+config(flowConfig).load({ flowJSON });
+```
+
+## Dependency Management
+
+### Installing Dependencies from flow.json
+The Flow CLI can automatically install dependencies defined in your `flow.json`:
+
+```bash
+flow dependencies install
+```
+
+### Example flow.json Dependencies Entry
+```json
+{
+  "dependencies": {
+    "flow-core-contracts": {
+      "testnet": "0x631e88ae7f1d7c20",
+      "mainnet": "0x9a0766d93b6608b7"
+    },
+    "flow-ft": {
+      "testnet": "0x7e60df042a9c0868",
+      "mainnet": "0x1654653399040a61"
+    }
+  }
+}
+```
+
+## Advanced Configuration
+
+### Multiple Network Support
+```typescript
+const getNetworkConfig = (network: string) => {
+  const configs = {
+    emulator: {
+      'flow.network': 'emulator',
+      'accessNode.api': 'http://127.0.0.1:3569',
+      'discovery.wallet': 'http://127.0.0.1:8701/flow/authenticate'
+    },
+    testnet: {
+      'flow.network': 'testnet',
+      'accessNode.api': 'https://rest-testnet.onflow.org',
+      'discovery.wallet': 'https://fcl-discovery.onflow.org/testnet/authn'
+    },
+    mainnet: {
+      'flow.network': 'mainnet',
+      'accessNode.api': 'https://rest-mainnet.onflow.org',
+      'discovery.wallet': 'https://fcl-discovery.onflow.org/mainnet/authn'
+    }
+  };
+  
+  return configs[network] || configs.testnet;
+};
+
+// Usage
+const networkConfig = getNetworkConfig('testnet');
+config(networkConfig).load({ flowJSON });
+```
+
+### Environment-Based Configuration
+```typescript
+const isDevelopment = process.env.NODE_ENV === 'development';
+const network = isDevelopment ? 'emulator' : 'testnet';
+
+config({
+  'flow.network': network,
+  'accessNode.api': process.env.FLOW_ACCESS_NODE,
+  'discovery.wallet': process.env.FLOW_DISCOVERY_WALLET,
+}).load({ flowJSON });
+```
+
+## Best Practices
+
+### 1. Keep flow.json in Version Control
+- Include `flow.json` in your repository
+- Exclude private keys and sensitive data
+- Use environment variables for production keys
+
+### 2. Consistent Network Naming
+- Use standard network names: `emulator`, `testnet`, `mainnet`
+- Match network names in aliases with FCL configuration
+- Document custom network configurations
+
+### 3. Contract Organization
+- Group related contracts together
+- Use descriptive contract names
+- Maintain consistent source paths
+
+### 4. Error Handling
+```typescript
+try {
+  await config(flowConfig).load({ flowJSON });
+} catch (error) {
+  console.error('Failed to load flow.json configuration:', error);
+  // Fallback to default configuration
+}
+```
+
+## Troubleshooting
+
+### Common Issues
+1. **Contract not found**: Verify contract name exists in `flow.json`
+2. **Wrong network**: Check `flow.network` configuration
+3. **Missing aliases**: Ensure all networks have contract addresses
+4. **Path issues**: Verify source paths are correct
+
+### Validation
+```typescript
+// Validate configuration before use
+const validateConfig = async () => {
+  try {
+    const network = await config().get('flow.network');
+    const contracts = flowJSON.contracts;
+    
+    if (!contracts || Object.keys(contracts).length === 0) {
+      throw new Error('No contracts defined in flow.json');
+    }
+    
+    console.log(`Configuration loaded for network: ${network}`);
+    return true;
+  } catch (error) {
+    console.error('Configuration validation failed:', error);
+    return false;
+  }
+};
+```
