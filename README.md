@@ -4,20 +4,22 @@ A comprehensive set of Cursor rules for building on the Flow blockchain with Cad
 
 ## Overview
 
-This repository contains 5 specialized `.mdc` files that serve as Cursor rules to guide AI assistance during Flow development:
+This repository contains 6 specialized `.mdc` files that serve as Cursor rules to guide AI assistance during Flow development:
 
 | File | Purpose |
 |------|---------|
 | `cadence-nft-standards.mdc` | NFT development standards, modular architecture patterns, security best practices |
 | `cadence-syntax-patterns.mdc` | Language syntax, common pitfalls, debugging strategies, authorization patterns |
 | `flow-development-workflow.mdc` | Complete development lifecycle, deployment strategies, FCL integration |
-| `flow-project-config.mdc` | `flow.json` management, multi-network configuration, contract deployment |
+| `flow-json.mdc` | Complete `flow.json` & CLI guide covering configuration, deployment, and multi-network management |
+| `fcl-flow-json-integration.mdc` | Frontend FCL integration with `flow.json`, React SDK setup, and contract imports |
+| `flow-security-best-practices.mdc` | Security practices for private keys, accounts, networks, and deployments |
 | `user-preferences.mdc` | Communication style and development philosophy preferences |
 
 ## How to Use
 
 ### 1. Add to Your Cursor Project
-Place these `.mdc` files in your Flow project root directory. Cursor will automatically detect and apply these rules when providing AI assistance.
+Place these `.mdc` files in your `./cursor/rules` Flow project root directory. Cursor will automatically detect and apply these rules when providing AI assistance.
 
 ### 2. Development Workflow
 The rules enforce this recommended development sequence:
@@ -33,6 +35,8 @@ The rules enforce this recommended development sequence:
 - **Full-Stack Coverage**: Spans from Cadence contracts to React/FCL frontend
 - **Documentation-First**: Prioritizes official Flow documentation and patterns
 - **Modular Architecture**: Advanced patterns for complex, evolving NFT systems
+- **Security-Focused**: Comprehensive security practices for production deployments
+- **Frontend Integration**: Seamless FCL setup with automated contract address resolution
 
 ## Quick Reference
 
@@ -43,6 +47,9 @@ The rules enforce this recommended development sequence:
 - ❌ Contract deployment verification gaps
 - ❌ Computation limit exceeded errors
 - ❌ Interface compliance violations
+- ❌ Private key management and security vulnerabilities
+- ❌ Multi-network configuration inconsistencies
+- ❌ Frontend contract address resolution failures
 
 ### Development Philosophy
 - **Documentation-Driven**: Reference official Flow docs first
