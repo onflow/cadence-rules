@@ -1,0 +1,490 @@
+---
+description: Streamlined Flow development workflow covering documentation-first debugging methodology, iterative development approach, deployment verification, gas optimization strategies, and comprehensive testnet validation protocols. Focuses on practical workflows and error prevention rather than configuration details.
+alwaysApply: false
+---
+# Flow Development Workflow
+
+## Documentation-First Approach
+
+**Core Principle**: Always reference official Flow documentation and standard examples when encountering issues or implementing new features.
+
+### Primary Documentation Sources
+1. [Flow Standard Contracts](https://github.com/onflow/flow-nft) - Reference deployed standard contracts
+2. [Official Flow Docs](https://developers.flow.com/) - Comprehensive guides
+3. [Cadence Language Reference](https://cadence-lang.org/) - Syntax and type system
+4. [FCL Documentation](https://docs.onflow.org/fcl/) - Frontend integration
+
+### When to Reference Documentation
+- ⚡ ALWAYS when implementing NFT/FT contracts from scratch
+- 🔍 When encountering unfamiliar Cadence errors
+- 🚀 Before deploying to testnet
+- 🔧 When adding new features to existing contracts
+- 🐛 When debugging complex type system or authorization errors
+
+## Development Sequence
+
+### Stage 1: Local Development
+```bash
+# 1. Setup configuration
+# Ensure flow.json and FCL config are correct
+
+# 2. Start emulator
+flow emulator
+
+# 3. Deploy and test contracts
+flow project deploy
+flow test
+
+# 4. Verify contract deployment
+# Run verification scripts to test contract members
+```
+
+### Stage 2: Frontend Integration (Emulator)
+```typescript
+// 1. Configure FCL for emulator
+// 2. Test authentication flow
+// 3. Test transactions with UI
+// 4. Verify error handling
+// 5. Test transaction lifecycle feedback
+```
+
+### Stage 3: Testnet Deployment
+```bash
+# 1. Verify testnet configuration
+flow config set env testnet
+
+# 2. Deploy contracts
+flow project deploy --network=testnet --signer testnet-deployer
+
+# 3. Run post-deployment verification
+# See Deployment Verification Protocol below
+```
+
+### Stage 4: Frontend Integration (Testnet)
+```typescript
+// 1. Switch FCL to testnet
+// 2. Verify contract addresses
+// 3. Test all user flows end-to-end
+// 4. Load test with multiple concurrent users (if possible)
+// 5. Verify events and indexing
+```
+
+## Deployment Verification Protocol
+
+**Critical**: Always verify deployment before proceeding.
+
+### Immediate Post-Deployment Checks
+
+```bash
+# 1. Verify CLI output shows success
+# Look for: "Contract 'MyContract' deployed to 0x..."
+
+# 2. Test contract access via script
+flow scripts execute cadence/scripts/verify-deployment.cdc
+```
+
+### Verification Script Template
+```cadence
+import MyContract from 0xYOUR_ADDRESS
+
+access(all) fun main(): {String: String} {
+    let result: {String: String} = {}
+
+    // Test public constants
+    result["StoragePath"] = MyContract.CollectionStoragePath.toString()
+    result["PublicPath"] = MyContract.CollectionPublicPath.toString()
+
+    // Test public functions (if safe to call)
+    let collection <- MyContract.createEmptyCollection()
+    result["createEmptyCollection"] = "OK"
+    destroy collection
+
+    return result
+}
+```
+
+### Frontend Verification
+```typescript
+// Test contract access from FCL
+import * as fcl from '@onflow/fcl';
+
+const verifyDeployment = async () => {
+  try {
+    const result = await fcl.query({
+      cadence: `
+        import MyContract from 0xCONTRACT_ADDRESS
+
+        access(all) fun main(): String {
+          return MyContract.CollectionStoragePath.toString()
+        }
+      `
+    });
+    console.log('✅ Contract accessible:', result);
+  } catch (error) {
+    console.error('❌ Contract not accessible:', error);
+  }
+};
+```
+
+## Debugging Methodology
+
+### Iterative Problem Solving
+1. **Reference Standard Contracts** - Compare against deployed Flow contracts
+2. **Check Official Patterns** - Verify code follows established patterns
+3. **Fix One Error at a Time** - Don't batch fixes
+4. **Test Frequently** - After each change
+5. **Core Contract Inspection** - Examine Flow's core contracts for patterns
+
+### Debugging Iteration Cycle
+
+#### For Contract Errors
+```bash
+# 1. Identify the exact error line from CLI output
+# 2. Check similar code in Flow's core contracts
+# 3. Make targeted fix
+# 4. Test immediately
+flow project deploy
+```
+
+#### For Transaction Errors
+```bash
+# 1. Examine full error output with stack trace
+# 2. Check authorization matches operations
+# 3. Verify all imports resolve correctly
+# 4. Test with minimal transaction scope
+flow transactions send cadence/transactions/test.cdc --network testnet
+```
+
+#### For FCL Errors
+```typescript
+// 1. Open browser DevTools (Console + Network tabs)
+// 2. Inspect FCL requests and responses
+// 3. Verify network configuration matches deployment
+// 4. Check contract address resolution
+// 5. Validate transaction Cadence syntax
+```
+
+### Smallest Test Case Principle
+When a transaction fails:
+- Reduce scope (fewer operations)
+- Simplify arguments (hardcode test values)
+- Minimize Cadence code (comment out sections)
+- Isolate the problematic code path
+
+### Error Resolution Patterns
+
+| Error Type | Check | Solution |
+|------------|-------|----------|
+| **Computation Limit Exceeded** | Loop iterations, string parsing | See Optimization section |
+| **Authorization Error** | Transaction `prepare()` entitlements | Add missing `auth()` capabilities |
+| **Unknown Member** | Contract deployed? Member public? | Verify deployment, check `access(all)` |
+| **Transaction Decode Failed** | FCL network config, import addresses | Align FCL network with deployment |
+| **Cannot Update Contract** | Changes to `init()` or struct fields | Deploy new version (V2) |
+
+## Optimizing for Computation Limits (Gas)
+
+### Identify Costly Operations
+Operations executed frequently in loops are prime optimization targets:
+- String parsing (`String.split()`)
+- Complex calculations inside loops
+- Repeated storage access
+- Excessive logging
+
+### Optimization Strategies
+
+#### 1. Move Constants Outside Loops
+```cadence
+// ❌ BAD: Parse in every iteration
+var i = 0
+while i < 250 {
+    let parts = trait.split(separator: ":") // Expensive!
+    i = i + 1
+}
+
+// ✅ GOOD: Parse once
+let parts = trait.split(separator: ":")
+var i = 0
+while i < 250 {
+    // Use parsed parts
+    i = i + 1
+}
+```
+
+#### 2. Use Accumulative Logic
+```cadence
+// ❌ BAD: Iterate through each step
+var i = 0
+while i < 250 {
+    complexCalculation(seeds[i])
+    i = i + 1
+}
+
+// ✅ GOOD: Calculate accumulated effect
+fun calculateAccumulatedEffect(seeds: [UInt64], steps: UInt64): UFix64 {
+    var total: UFix64 = 0.0
+    var seed = seeds[0]
+
+    var i: UInt64 = 0
+    while i < steps {
+        // Generate step-specific seed efficiently
+        seed = (seed * 1664525 + 1013904223) % 4294967296
+        let factor = UFix64(seed % 1000) / 999.0
+        total = total + (factor * baseRate)
+        i = i + 1
+    }
+    return total
+}
+```
+
+#### 3. Remove or Minimize Logging
+```cadence
+// ❌ BAD: Logging in production, especially in loops
+log("Processing step ".concat(i.toString()))
+
+// ✅ GOOD: Use events for critical actions only
+emit ImportantActionCompleted(id: nftID, value: result)
+```
+
+#### 4. Process in Chunks
+For large backlogs:
+```cadence
+// Allow partial processing
+access(all) fun evolvePartial(maxSteps: UInt64) {
+    let elapsed = calculateElapsedSteps()
+    let toProcess = elapsed < maxSteps ? elapsed : maxSteps
+
+    processSteps(toProcess)
+    self.lastProcessedTimestamp = getCurrentBlock().timestamp
+}
+```
+
+### Optimization Workflow
+1. **Profile on Testnet** - Identify which transactions hit limits
+2. **Measure Impact** - Test with different optimization approaches
+3. **Refactor Contract** - Implement accumulative logic
+4. **Test Incremental Processing** - Ensure partial updates work
+5. **Validate Results** - Ensure optimization doesn't change outcomes
+
+## Contract Updates & Versioning
+
+### When You Can Update
+```bash
+# Safe updates (no breaking changes):
+flow project deploy --network=testnet --update
+
+# - Add new functions
+# - Modify function logic
+# - Add new fields to contract (not resources/structs)
+```
+
+### When You Need New Version
+Deploy as new contract when:
+- ❌ Changing resource/struct field definitions
+- ❌ Modifying `init()` function signature
+- ❌ Removing or renaming existing functions
+- ❌ Changing event definitions
+
+```bash
+# Deploy new version
+# 1. Create MyContractV2.cdc
+# 2. Add to flow.json
+# 3. Deploy as new contract
+flow project deploy --network=testnet
+```
+
+### Immutable Field Workarounds
+
+For fields added after deployment:
+
+#### Lazy Initialization
+```cadence
+access(all) resource NFT {
+    access(all) var oldField: String
+    access(all) var newField: UFix64?  // Optional: didn't exist in original init()
+
+    init(old: String) {
+        self.oldField = old
+        self.newField = nil
+    }
+
+    // Ensure initialized before use
+    access(all) fun ensureNewFieldInitialized() {
+        if self.newField == nil {
+            self.newField = 10.0  // Default value
+        }
+    }
+
+    access(all) view fun getNewField(): UFix64 {
+        if self.newField == nil {
+            return 0.0  // Safe default for view functions
+        }
+        return self.newField!
+    }
+}
+```
+
+#### Migration Function
+```cadence
+access(all) contract MyContract {
+    // Add admin function for existing instances
+    access(all) fun migrateNFT(id: UInt64) {
+        // Logic to update existing NFT instances
+    }
+}
+```
+
+## Comprehensive Testnet Validation Protocol
+
+**Before Mainnet**: Conduct rigorous end-to-end validation on testnet.
+
+### Validation Checklist
+
+#### 1. Functional Testing
+- [ ] All key user flows work end-to-end
+- [ ] Edge cases handled correctly
+- [ ] Error messages are clear
+- [ ] Transaction failures handled gracefully
+- [ ] All contract functions tested
+
+#### 2. Integration Testing
+- [ ] Interactions with standard contracts (NFT, FT)
+- [ ] Cross-contract calls work correctly
+- [ ] Frontend FCL integration stable
+- [ ] Authentication flow works across wallets
+- [ ] Transaction status updates correctly
+
+#### 3. Performance & Load Testing
+- [ ] Batch operations tested (if applicable)
+- [ ] Concurrent transactions simulated
+- [ ] Gas limits not exceeded
+- [ ] Contract methods respond within acceptable time
+- [ ] No computation limit errors
+
+#### 4. Event & Indexing Verification
+- [ ] All expected events emitted
+- [ ] Event payloads contain correct data
+- [ ] Off-chain indexing works (if applicable)
+- [ ] Event format matches documentation
+
+#### 5. Security Review
+- [ ] Access control enforced correctly
+- [ ] Capabilities properly restricted
+- [ ] No exposed admin functions
+- [ ] Input validation working
+- [ ] No obvious attack vectors
+
+#### 6. Cross-Browser & Device Testing
+- [ ] Desktop browsers (Chrome, Firefox, Safari)
+- [ ] Mobile browsers (iOS Safari, Android Chrome)
+- [ ] Wallet integrations work across platforms
+- [ ] UI responsive and accessible
+
+#### 7. Deployment Preparation
+- [ ] Mainnet `flow.json` ready with correct addresses
+- [ ] Mainnet signer account funded
+- [ ] FCL config updated for mainnet
+- [ ] Environment variables set correctly
+- [ ] Rollback plan documented
+- [ ] Deployment checklist prepared
+
+### Testnet Environment Best Practices
+- Use separate, clean testnet environment for validation
+- Mirror production configuration as closely as possible
+- Document all test scenarios and results
+- Keep testnet deployed contracts stable during validation
+
+## Workflow Optimization Tips
+
+### Deploy Incrementally
+For complex systems with multiple contracts:
+1. Deploy core contracts first
+2. Test core functionality
+3. Deploy dependent modules one by one
+4. Test each addition before proceeding
+
+### Use Correct Signer and Network
+Common mistake: Using emulator account on testnet
+```bash
+# ❌ WRONG
+flow transactions send tx.cdc --signer emulator-account --network testnet
+
+# ✅ CORRECT
+flow transactions send tx.cdc --signer testnet-deployer --network testnet
+```
+
+### Hardcoded Values Strategy
+```cadence
+// For testing: Hardcode in transaction
+transaction {
+    let value: UFix64 = 10.0  // Quick test
+}
+
+// For production: Use parameters
+transaction(value: UFix64) {
+    // Flexible, reusable
+}
+```
+
+## Quick Debugging Reference
+
+### Contract Compilation Error
+1. Check syntax against [rules/cadence/](./rules/cadence/)
+2. Verify imports resolve correctly
+3. Ensure single contract per file
+4. Compare with Flow core contracts
+
+### Deployment Error
+1. Verify `flow.json` configuration
+2. Check signer account has FLOW
+3. Ensure contracts compile without errors
+4. Validate all dependencies available
+
+### Transaction Error
+1. Check authorization entitlements
+2. Verify contract addresses correct
+3. Validate transaction structure
+4. Test with simpler version
+
+### FCL Error
+1. Open browser DevTools
+2. Check network tab for failed requests
+3. Verify FCL config matches deployment network
+4. Validate contract address resolution
+
+## Essential Commands Quick Reference
+
+```bash
+# Development
+flow init                           # Initialize project
+flow emulator                       # Start emulator
+flow project deploy                 # Deploy to emulator
+flow project deploy --network=testnet --signer testnet-deployer
+
+# Testing & Validation
+flow test                          # Run tests
+flow scripts execute <script>      # Run script
+flow transactions send <tx>        # Send transaction
+flow config validate               # Validate flow.json
+
+# Network Management
+flow config set env testnet        # Switch to testnet
+flow accounts get <address>        # Check account balance
+
+# Debugging
+flow cadence lint                  # Check code quality
+flow dependencies install          # Install dependencies
+```
+
+## Workflow Summary
+
+**Development Lifecycle:**
+1. Configure → 2. Emulator Test → 3. Frontend Emulator Test → 4. Testnet Deploy → 5. Testnet Validation → 6. Mainnet Deploy
+
+**Key Principles:**
+- 📚 Documentation-first approach
+- 🔄 Iterative problem solving
+- ✅ Verify after each deployment
+- 🎯 Test frequently and incrementally
+- 🔍 Debug systematically with logs and tools
+- ⚡ Optimize for gas efficiency
+- 🛡️ Comprehensive testnet validation before mainnet

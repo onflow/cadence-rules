@@ -1,0 +1,679 @@
+---
+description: Comprehensive guide to Flow project configuration covering flow.json structure, CLI workflow, FCL integration, network management, and deployment best practices. Covers contract aliases, account management, dependency resolution, frontend FCL setup with React SDK, and environment-based configuration for seamless multi-network development.
+alwaysApply: false
+---
+# Flow Configuration Guide
+
+## Overview
+
+This guide covers all aspects of Flow project configuration, from `flow.json` setup to FCL frontend integration. Use this as your central reference for configuring Flow projects across all environments.
+
+## Quick Start
+
+### Initialize Project
+```bash
+flow init
+```
+
+Creates:
+- `flow.json` - Central configuration
+- `emulator-account.pkey` - Emulator service account key
+- `cadence/` directory structure
+
+### Project Structure
+```
+my-project/
+├── flow.json
+├── emulator-account.pkey
+├── cadence/
+│   ├── contracts/
+│   ├── scripts/
+│   ├── transactions/
+│   └── tests/
+└── src/
+    └── config/
+        └── fcl-config.js
+```
+
+## flow.json Structure
+
+### Core Sections
+
+```json
+{
+  "networks": {},      // Network endpoints
+  "accounts": {},      // Named accounts with keys
+  "contracts": {},     // Contract sources and aliases
+  "dependencies": {},  // External contract dependencies
+  "deployments": {},   // Deployment targets
+  "emulators": {}     // Custom emulator settings (optional)
+}
+```
+
+### Networks Configuration
+
+#### Basic Setup
+```json
+"networks": {
+  "emulator": "127.0.0.1:3569",
+  "testnet": "access.devnet.nodes.onflow.org:9000",
+  "mainnet": "access.mainnet.nodes.onflow.org:9000"
+}
+```
+
+#### Custom Networks
+```json
+"networks": {
+  "emulator": "127.0.0.1:3569",
+  "local-testnet": "127.0.0.1:3569",
+  "testnet": "access.devnet.nodes.onflow.org:9000",
+  "staging": {
+    "host": "access-001.devnet30.nodes.onflow.org:9001",
+    "key": "ba69f7d2e82b9edf..."
+  }
+}
+```
+
+### Accounts Configuration
+
+#### Recommended: File-Based Keys
+```json
+"accounts": {
+  "emulator-account": {
+    "address": "f8d6e0586b0a20c7",
+    "key": {
+      "type": "file",
+      "location": "emulator-account.pkey"
+    }
+  },
+  "testnet-deployer": {
+    "address": "544ad93e4effc077",
+    "key": {
+      "type": "file",
+      "location": "testnet-deployer.pkey"
+    }
+  }
+}
+```
+
+#### Environment Variables (Production)
+```json
+"accounts": {
+  "mainnet-account": {
+    "address": "1234567890abcdef",
+    "key": "${FLOW_MAINNET_PRIVATE_KEY}"
+  }
+}
+```
+
+#### Account Best Practices
+- ✅ Use file-based keys for security
+- ✅ Never commit private keys to version control
+- ✅ Verify account names match exactly (no typos)
+- ✅ Ensure addresses match actual on-chain addresses
+- ✅ Use environment variables for production keys
+
+### Contracts Configuration
+
+#### Basic Contract Setup
+```json
+"contracts": {
+  "MyContract": {
+    "source": "./cadence/contracts/MyContract.cdc",
+    "aliases": {
+      "emulator": "f8d6e0586b0a20c7",
+      "testnet": "544ad93e4effc077"
+    }
+  }
+}
+```
+
+#### Contract Best Practices
+- ✅ Register contracts BEFORE deployment
+- ✅ Verify source paths are correct
+- ✅ Use network-specific aliases
+- ✅ Keep contract names consistent across networks
+
+### Dependencies Configuration
+
+#### Core Flow Contracts
+```json
+"dependencies": {
+  "NonFungibleToken": {
+    "source": "mainnet://1d7e57aa55817448.NonFungibleToken",
+    "hash": "b63f10e00d1a814492822652dac7c0574428a200e4c26cb3c832c4829e2778f0",
+    "aliases": {
+      "emulator": "f8d6e0586b0a20c7",
+      "testnet": "631e88ae7f1d7c20",
+      "mainnet": "1d7e57aa55817448"
+    }
+  },
+  "FungibleToken": {
+    "source": "mainnet://f233dcee88fe0abe.FungibleToken",
+    "hash": "23c1159cf99b2b039b6b868d782d57ae39b8d784045d81597f100a4782f0285b",
+    "aliases": {
+      "emulator": "ee82856bf20e2aa6",
+      "testnet": "9a0766d93b6608b7",
+      "mainnet": "f233dcee88fe0abe"
+    }
+  },
+  "MetadataViews": {
+    "source": "mainnet://1d7e57aa55817448.MetadataViews",
+    "hash": "...",
+    "aliases": {
+      "emulator": "f8d6e0586b0a20c7",
+      "testnet": "631e88ae7f1d7c20",
+      "mainnet": "1d7e57aa55817448"
+    }
+  }
+}
+```
+
+#### Dependency Management
+```bash
+# Install dependencies
+flow dependencies install
+
+# Update dependencies
+flow dependencies update
+
+# List dependencies
+flow dependencies list
+```
+
+### Deployments Configuration
+
+```json
+"deployments": {
+  "emulator": {
+    "emulator-account": ["MyContract", "AnotherContract"]
+  },
+  "testnet": {
+    "testnet-deployer": ["MyContract"]
+  },
+  "mainnet": {
+    "mainnet-account": ["MyContract"]
+  }
+}
+```
+
+## FCL Configuration
+
+### Install FCL
+```bash
+npm install @onflow/fcl
+# or
+yarn add @onflow/fcl
+```
+
+### Basic FCL Setup
+
+#### Configuration File
+```typescript
+// src/config/fcl-config.ts
+import { config } from '@onflow/fcl';
+import flowJSON from '../../flow.json';
+
+// Network-specific configurations
+const networkConfigs = {
+  emulator: {
+    'flow.network': 'emulator',
+    'accessNode.api': 'http://127.0.0.1:8888',
+    'discovery.wallet': 'http://localhost:8701/fcl/authn'
+  },
+  testnet: {
+    'flow.network': 'testnet',
+    'accessNode.api': 'https://rest-testnet.onflow.org',
+    'discovery.wallet': 'https://fcl-discovery.onflow.org/testnet/authn'
+  },
+  mainnet: {
+    'flow.network': 'mainnet',
+    'accessNode.api': 'https://rest-mainnet.onflow.org',
+    'discovery.wallet': 'https://fcl-discovery.onflow.org/authn'
+  }
+};
+
+// Select network based on environment
+const network = process.env.NEXT_PUBLIC_FLOW_NETWORK || 'testnet';
+const networkConfig = networkConfigs[network];
+
+// App metadata
+const appConfig = {
+  'app.detail.title': 'My Flow App',
+  'app.detail.icon': 'https://myapp.com/icon.png',
+  'app.detail.description': 'A Flow blockchain application',
+  'app.detail.url': 'https://myapp.com'
+};
+
+// Initialize configuration
+config({
+  ...networkConfig,
+  ...appConfig
+}).load({ flowJSON });
+
+export { config };
+```
+
+### React Integration
+
+#### Wrap App with FlowProvider
+```typescript
+// src/App.tsx
+import { FlowProvider } from '@onflow/react-sdk';
+import './config/fcl-config';
+
+function App() {
+  return (
+    <FlowProvider>
+      <YourAppComponents />
+    </FlowProvider>
+  );
+}
+
+export default App;
+```
+
+### Contract Address Management
+
+#### Environment-Based Addresses
+```typescript
+// src/config/contracts.ts
+const contracts = {
+  emulator: {
+    MyContract: '0xf8d6e0586b0a20c7',
+    NonFungibleToken: '0xf8d6e0586b0a20c7',
+    MetadataViews: '0xf8d6e0586b0a20c7'
+  },
+  testnet: {
+    MyContract: '0x544ad93e4effc077',
+    NonFungibleToken: '0x631e88ae7f1d7c20',
+    MetadataViews: '0x631e88ae7f1d7c20'
+  },
+  mainnet: {
+    MyContract: '0x...',
+    NonFungibleToken: '0x1d7e57aa55817448',
+    MetadataViews: '0x1d7e57aa55817448'
+  }
+};
+
+const network = process.env.NEXT_PUBLIC_FLOW_NETWORK || 'testnet';
+export const contractAddresses = contracts[network];
+```
+
+### Clean Import Syntax
+
+After configuring FCL with `flow.json`, use simple contract names:
+
+```cadence
+// In Cadence scripts/transactions
+import "MyContract"
+import "NonFungibleToken"
+
+// FCL automatically resolves to correct addresses
+```
+
+### Dynamic Import Replacement
+
+```typescript
+// When sending transactions
+import * as fcl from '@onflow/fcl';
+import { contractAddresses } from './config/contracts';
+
+const transactionCode = `
+  import MyContract from 0xMYCONTRACT
+
+  transaction {
+    execute {
+      MyContract.doSomething()
+    }
+  }
+`;
+
+const txId = await fcl.mutate({
+  cadence: transactionCode,
+  args: (arg, t) => [],
+  limit: 9999,
+  // Replace import addresses
+  replace: {
+    '0xMYCONTRACT': contractAddresses.MyContract
+  }
+});
+```
+
+## CLI Workflow
+
+### Configuration Management
+
+```bash
+# Add items via CLI
+flow config add account
+flow config add contract
+flow config add deployment
+
+# Remove items
+flow config remove account my-account
+flow config remove contract my-contract
+
+# Validate configuration
+flow config validate
+```
+
+### Development Workflow
+
+```bash
+# 1. Start emulator
+flow emulator
+
+# 2. Deploy contracts
+flow project deploy
+
+# 3. Run scripts
+flow scripts execute cadence/scripts/my-script.cdc
+
+# 4. Send transactions
+flow transactions send cadence/transactions/my-tx.cdc
+
+# 5. Run tests
+flow test
+```
+
+### Network Management
+
+```bash
+# Switch networks
+flow config set env testnet
+
+# Create accounts
+flow accounts create
+
+# Generate keys
+flow keys generate
+```
+
+### Deployment
+
+```bash
+# Deploy to emulator (default)
+flow project deploy
+
+# Deploy to testnet
+flow project deploy --network=testnet --signer testnet-deployer
+
+# Update existing contracts
+flow project deploy --network=testnet --update
+
+# Deploy specific network
+flow config set env testnet
+flow project deploy
+```
+
+## Multi-Network Strategy
+
+### Network-Specific Aliases
+
+Use distinct contract names per network for clarity:
+
+```json
+{
+  "contracts": {
+    "MyContract_Emulator": "./cadence/contracts/MyContract.cdc",
+    "MyContract_Testnet": "./cadence/contracts/MyContract.cdc",
+    "MyContract_Mainnet": "./cadence/contracts/MyContract.cdc"
+  },
+  "deployments": {
+    "emulator": {
+      "emulator-account": ["MyContract_Emulator"]
+    },
+    "testnet": {
+      "testnet-deployer": ["MyContract_Testnet"]
+    },
+    "mainnet": {
+      "mainnet-account": ["MyContract_Mainnet"]
+    }
+  }
+}
+```
+
+### Environment Variables
+
+```bash
+# .env.development
+NEXT_PUBLIC_FLOW_NETWORK=emulator
+NEXT_PUBLIC_ACCESS_NODE=http://127.0.0.1:8888
+
+# .env.staging
+NEXT_PUBLIC_FLOW_NETWORK=testnet
+NEXT_PUBLIC_ACCESS_NODE=https://rest-testnet.onflow.org
+
+# .env.production
+NEXT_PUBLIC_FLOW_NETWORK=mainnet
+NEXT_PUBLIC_ACCESS_NODE=https://rest-mainnet.onflow.org
+FLOW_MAINNET_PRIVATE_KEY=<secure-key>
+```
+
+## Common Issues & Solutions
+
+### Configuration Errors
+
+#### Issue: "Account not found"
+```bash
+# Solution: Verify account name spelling
+flow config validate
+# Check accounts section in flow.json
+```
+
+#### Issue: "Contract not found"
+```bash
+# Solution: Ensure contract is registered
+# Add to flow.json contracts section first
+flow config add contract
+```
+
+#### Issue: "Address mismatch"
+- Verify contract addresses match between `flow.json`, Cadence imports, and FCL config
+- Check network-specific aliases are correct
+- Ensure FCL network matches deployment target
+
+### Import Resolution Errors
+
+#### Issue: "Failed to resolve import"
+**CLI**: Missing or incorrect alias in `flow.json` for current network
+```json
+// Fix: Add alias for target network
+"contracts": {
+  "MyContract": {
+    "source": "./cadence/contracts/MyContract.cdc",
+    "aliases": {
+      "testnet": "544ad93e4effc077"  // Add this
+    }
+  }
+}
+```
+
+**FCL**: Missing address mapping in frontend config
+```typescript
+// Fix: Add to FCL config
+config({
+  "0xMyContract": "0x544ad93e4effc077"
+});
+```
+
+### Deployment Issues
+
+#### Issue: "Insufficient FLOW"
+- Fund the deploying account with FLOW tokens
+- Check account balance: `flow accounts get <address>`
+
+#### Issue: "Cannot update contract"
+- Changes to `init()` or resource/struct fields require new contract version
+- Deploy as `MyContractV2.cdc` instead of using `--update`
+
+### FCL Frontend Issues
+
+#### Issue: "Transaction failed to decode"
+- Verify FCL network config matches deployment network
+- Check contract addresses in frontend match deployed addresses
+- Validate transaction Cadence syntax
+
+#### Issue: "Capability not found"
+- Ensure account has initialized the resource
+- Run setup transaction first
+- Check storage paths match between contract and transaction
+
+## Best Practices Summary
+
+### Security
+- ✅ Never commit private keys to version control
+- ✅ Use file-based keys for development
+- ✅ Use environment variables for production
+- ✅ Add `.pkey` files to `.gitignore`
+- ✅ Rotate keys regularly
+
+### Configuration
+- ✅ Validate configuration before deployment
+- ✅ Use consistent naming across networks
+- ✅ Document custom configurations
+- ✅ Keep `flow.json` in version control (excluding keys)
+
+### Development Workflow
+- ✅ Test on emulator first
+- ✅ Deploy to testnet for integration testing
+- ✅ Validate with frontend before mainnet
+- ✅ Use network-specific environment variables
+- ✅ Maintain separate configs per environment
+
+### Contract Management
+- ✅ Register contracts before deployment
+- ✅ Use dependencies for standard contracts
+- ✅ Verify hashes for security
+- ✅ Keep source paths consistent
+- ✅ Document breaking changes
+
+### Frontend Integration
+- ✅ Synchronize FCL config with `flow.json`
+- ✅ Use environment-based address resolution
+- ✅ Handle network switching gracefully
+- ✅ Validate user authentication state
+- ✅ Provide clear transaction feedback
+
+## Complete Example
+
+### flow.json
+```json
+{
+  "contracts": {
+    "MyNFT": {
+      "source": "./cadence/contracts/MyNFT.cdc",
+      "aliases": {
+        "emulator": "f8d6e0586b0a20c7",
+        "testnet": "544ad93e4effc077"
+      }
+    }
+  },
+  "dependencies": {
+    "NonFungibleToken": {
+      "source": "mainnet://1d7e57aa55817448.NonFungibleToken",
+      "hash": "b63f10e00d1a814492822652dac7c0574428a200e4c26cb3c832c4829e2778f0",
+      "aliases": {
+        "emulator": "f8d6e0586b0a20c7",
+        "testnet": "631e88ae7f1d7c20"
+      }
+    }
+  },
+  "networks": {
+    "emulator": "127.0.0.1:3569",
+    "testnet": "access.devnet.nodes.onflow.org:9000"
+  },
+  "accounts": {
+    "emulator-account": {
+      "address": "f8d6e0586b0a20c7",
+      "key": {
+        "type": "file",
+        "location": "emulator-account.pkey"
+      }
+    },
+    "testnet-deployer": {
+      "address": "544ad93e4effc077",
+      "key": {
+        "type": "file",
+        "location": "testnet-deployer.pkey"
+      }
+    }
+  },
+  "deployments": {
+    "emulator": {
+      "emulator-account": ["MyNFT"]
+    },
+    "testnet": {
+      "testnet-deployer": ["MyNFT"]
+    }
+  }
+}
+```
+
+### FCL Config
+```typescript
+import { config } from '@onflow/fcl';
+import flowJSON from '../flow.json';
+
+const networkConfigs = {
+  emulator: {
+    'flow.network': 'emulator',
+    'accessNode.api': 'http://127.0.0.1:8888',
+    'discovery.wallet': 'http://localhost:8701/fcl/authn'
+  },
+  testnet: {
+    'flow.network': 'testnet',
+    'accessNode.api': 'https://rest-testnet.onflow.org',
+    'discovery.wallet': 'https://fcl-discovery.onflow.org/testnet/authn'
+  }
+};
+
+const network = process.env.NEXT_PUBLIC_FLOW_NETWORK || 'emulator';
+
+config({
+  ...networkConfigs[network],
+  'app.detail.title': 'My NFT App',
+  'app.detail.icon': 'https://myapp.com/icon.png'
+}).load({ flowJSON });
+```
+
+## Quick Reference
+
+### Essential Commands
+```bash
+flow init                    # Initialize project
+flow emulator                # Start emulator
+flow project deploy          # Deploy contracts
+flow config validate         # Validate configuration
+flow test                    # Run tests
+flow dependencies install    # Install dependencies
+```
+
+### Network Switching
+```bash
+flow config set env emulator
+flow config set env testnet
+flow config set env mainnet
+```
+
+### Common Paths
+```
+Storage: /storage/MyResource
+Public: /public/MyCapability
+Private: /private/MyCapability
+```
+
+### Standard Contract Addresses
+
+**Testnet:**
+- NonFungibleToken: `0x631e88ae7f1d7c20`
+- FungibleToken: `0x9a0766d93b6608b7`
+- MetadataViews: `0x631e88ae7f1d7c20`
+- FlowToken: `0x7e60df042a9c0868`
+
+**Mainnet:**
+- NonFungibleToken: `0x1d7e57aa55817448`
+- FungibleToken: `0xf233dcee88fe0abe`
+- MetadataViews: `0x1d7e57aa55817448`
+- FlowToken: `0x1654653399040a61`
