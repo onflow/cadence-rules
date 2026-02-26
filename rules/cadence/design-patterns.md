@@ -145,10 +145,10 @@ import "NFTContract"
 access(all) fun main(owner: Address, nftID: UInt64): NFTContract.NFTReport {
     let collection = getAccount(owner)
         .capabilities.borrow<&Collection>(/public/collection)
-        ?? panic("Collection not found")
+        ?? panic("Could not borrow Collection reference from /public/collection")
 
     let nft = collection.borrowNFT(id: nftID)
-        ?? panic("NFT not found")
+        ?? panic("NFT with ID \(nftID) not found in collection")
 
     return nft.generateReport()  // Returns struct, not resource
 }
@@ -286,19 +286,19 @@ transaction(nftID: UInt64, price: UFix64) {
     prepare(buyer: auth(BorrowValue, SaveValue) &Account) {
         self.buyerCollection = buyer.storage
             .borrow<&NFTCollection>(from: /storage/collection)
-            ?? panic("Buyer collection not found")
+            ?? panic("Could not borrow NFTCollection reference from /storage/collection")
 
         // Create payment
         let vault = buyer.storage
             .borrow<auth(FungibleToken.Withdraw) &Vault>(from: /storage/vault)
-            ?? panic("Vault not found")
+            ?? panic("Could not borrow Vault reference from /storage/vault")
 
         self.payment <- vault.withdraw(amount: price)
 
         // Borrow seller collection
         self.sellerCollection = getAccount(sellerAddress)
             .capabilities.borrow<&NFTCollection>(/public/collection)
-            ?? panic("Seller collection not found")
+            ?? panic("Could not borrow NFTCollection reference from /public/collection")
     }
 
     execute {
@@ -334,7 +334,7 @@ transaction() {
     prepare(signer: auth(LoadValue, SaveValue) &Account) {
         // Load resource (expensive)
         let vault <- signer.storage.load<@Vault>(from: /storage/vault)
-            ?? panic("Vault not found")
+            ?? panic("Vault not found at /storage/vault")
 
         // Modify
         vault.someFunction()
@@ -350,7 +350,7 @@ transaction() {
         // Borrow reference (cheap)
         let vaultRef = signer.storage
             .borrow<&Vault>(from: /storage/vault)
-            ?? panic("Vault not found")
+            ?? panic("Could not borrow Vault reference from /storage/vault")
 
         // Modify in place
         vaultRef.someFunction()
@@ -400,7 +400,7 @@ transaction(providerAddress: Address) {
         let cap = recipient.inbox.claim<&MyResource>(
             name: "myResourceAccess",
             provider: providerAddress
-        ) ?? panic("Capability not found in inbox")
+        ) ?? panic("Capability named \"myResourceAccess\" not found in inbox from provider \(providerAddress)")
 
         // Save or use capability
         recipient.storage.save(cap, to: /storage/receivedCapability)
@@ -471,7 +471,7 @@ transaction() {
         // Store controller for later revocation
         let controllers = signer.storage
             .borrow<&[StorageCapabilityController]>(from: /storage/controllers)
-            ?? panic("Controllers not found")
+            ?? panic("Could not borrow StorageCapabilityController reference from /storage/controllers")
 
         controllers.append(controller)
     }
@@ -571,7 +571,7 @@ access(all) resource Collection {
     // Withdraw item
     access(all) fun withdraw(id: UInt64): @Item {
         let item <- self.items.remove(key: id)
-            ?? panic("Item not found")
+            ?? panic("Item with ID \(id) not found in collection")
         return <-item
     }
 
@@ -647,7 +647,7 @@ transaction() {
             .borrow<&AnyResource>(from: /storage/myResource)
 
         if existing != nil {
-            panic("Path already contains a resource")
+            panic("Path /storage/myResource is already in use")
         }
 
         // Safe to save

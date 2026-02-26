@@ -296,7 +296,7 @@ if cap.check() {
         receiver.deposit(from: <-vault)
     }
 } else {
-    panic("Invalid capability")
+    panic("Could not borrow FungibleToken Receiver reference from /public/receiver")
 }
 
 // ✅ ALSO CORRECT: Borrow returns optional
@@ -306,7 +306,7 @@ let cap = getAccount(address)
 if let receiver = cap.borrow() {
     receiver.deposit(from: <-vault)
 } else {
-    panic("Could not borrow capability")
+    panic("Could not borrow FungibleToken Receiver reference from /public/receiver")
 }
 
 // ❌ WRONG: Force unwrap without checking
@@ -551,7 +551,7 @@ access(all) resource ProtectedResource {
                 self.data = newData
             }
         } else {
-            panic("Invalid authorization proof")
+            panic("Authorization proof capability is invalid or does not match this resource's owner")
         }
     }
 }

@@ -70,7 +70,7 @@ transaction() {
         // All storage access happens here, in user-controlled code
         let vault = signer.storage
             .borrow<auth(FungibleToken.Withdraw) &{FungibleToken.Vault}>(from: /storage/vault)
-            ?? panic("Vault not found")
+            ?? panic("Could not borrow FungibleToken Vault reference from /storage/vault")
 
         // Pass only the reference, not account
         SecureContract.processVault(vault: vault)
@@ -173,7 +173,8 @@ access(all) contract GoodContract {
         self.internalCounter = 0
     }
 
-    // Public but safe operation
+    // Public but safe operation, though typically state changing operations
+    // require some sort of authentication
     access(all) fun incrementCounter() {
         self.internalCounter = self.internalCounter + 1
     }
@@ -221,7 +222,7 @@ access(all) contract GoodContract {
         return nil
     }
 
-    access(all) fun getUserData(address: Address): UserData? {
+    access(all) view fun getUserData(address: Address): UserData? {
         return self.userData[address]
     }
 

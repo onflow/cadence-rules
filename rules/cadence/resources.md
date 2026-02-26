@@ -348,7 +348,7 @@ access(all) resource NFTCollection {
     // Withdraw (remove and return)
     access(all) fun withdraw(id: UInt64): @NFT {
         let nft <- self.nfts.remove(key: id)
-            ?? panic("NFT not found")
+            ?? panic("NFT with ID \(id) not found in collection")
         return <-nft
     }
 
@@ -357,7 +357,7 @@ access(all) resource NFTCollection {
         let id = nft.id
 
         // Check if already exists
-        assert(self.nfts[id] == nil, message: "NFT already exists")
+        assert(self.nfts[id] == nil, message: "NFT with ID \(id) already exists in collection")
 
         // Insert (use force-insert operator <-!)
         self.nfts[id] <-! nft
@@ -629,7 +629,7 @@ let vaultRef = capability.borrow<&Vault>()
 transaction() {
     prepare(signer: auth(Storage) &Account) {
         let vault <- signer.storage.load<@Vault>(from: /storage/oldVault)
-            ?? panic("Vault not found")
+            ?? panic("Vault not found at /storage/oldVault")
 
         signer.storage.save(<-vault, to: /storage/newVault)
     }

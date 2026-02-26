@@ -158,7 +158,7 @@ access(all) contract MyNFT {
 
         access(all) fun withdraw(id: UInt64): @NFT {
             return <- self.items.remove(key: id)
-                ?? panic("NFT not found")
+                ?? panic("NFT with ID \(id) not found in collection")
         }
 
         access(all) fun borrowNFT(id: UInt64): &{NFTPublic}? {
@@ -189,7 +189,7 @@ transaction(amount: UFix64, recipient: Address) {
     prepare(signer: auth(BorrowValue) &Account) {
         self.senderVault = signer.storage
             .borrow<&{FungibleToken.Provider}>(from: /storage/vault)
-            ?? panic("Vault not found")
+            ?? panic("Could not borrow FungibleToken Provider reference from /storage/vault")
 
         self.recipientVault = getAccount(recipient)
             .capabilities.borrow<&{FungibleToken.Receiver}>(/public/receiver)

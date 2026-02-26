@@ -120,7 +120,7 @@ transaction() {
         // Borrow reference from storage
         let vaultRef = signer.storage
             .borrow<&Vault>(from: /storage/vault)
-            ?? panic("Vault not found")
+            ?? panic("Could not borrow Vault reference from /storage/vault")
 
         // Use reference
         log(vaultRef.balance)
@@ -138,7 +138,7 @@ transaction() {
         // Borrow with entitlements
         let vaultRef = signer.storage
             .borrow<auth(FungibleToken.Withdraw) &Vault>(from: /storage/vault)
-            ?? panic("Vault not found")
+            ?? panic("Could not borrow Vault reference from /storage/vault")
 
         // Can call entitled functions
         let withdrawn <- vaultRef.withdraw(amount: 10.0)
@@ -398,7 +398,7 @@ transaction() {
     execute {
         let vaultRef = getAccount(address)
             .capabilities.borrow<&{VaultPublic}>(/public/vault)
-            ?? panic("Vault not found")
+            ?? panic("Could not borrow VaultPublic reference from /public/vault")
 
         vaultRef.getBalance()  // OK
         vaultRef.deposit(from: <-vault)  // OK
@@ -490,7 +490,7 @@ transaction() {
     prepare(signer: auth(BorrowValue) &Account) {
         let vaultRef = signer.storage
             .borrow<&Vault>(from: /storage/vault)
-            ?? panic("Vault not found")
+            ?? panic("Could not borrow Vault reference from /storage/vault")
 
         // Use reference
         log(vaultRef.balance)
@@ -619,7 +619,7 @@ transaction() {
     prepare(signer: auth(BorrowValue) &Account) {
         // Most common pattern
         let ref = signer.storage.borrow<&Vault>(from: /storage/vault)
-            ?? panic("Not found")
+            ?? panic("Could not borrow Vault reference from /storage/vault")
 
         log(ref.balance)
     }

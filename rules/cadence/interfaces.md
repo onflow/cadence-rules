@@ -109,7 +109,7 @@ access(all) resource Vault: Provider, Receiver {
 
     access(all) fun withdraw(amount: UFix64): @Vault {
         pre {
-            self.balance >= amount: "Insufficient balance"
+            self.balance >= amount: "Insufficient balance: available \(self.balance), required \(amount)"
         }
 
         self.balance = self.balance - amount
@@ -288,7 +288,7 @@ access(all) resource interface Vault {
 
     access(all) fun withdraw(amount: UFix64): @Vault {
         pre {
-            self.balance >= amount: "Insufficient balance"
+            self.balance >= amount: "Insufficient balance: available \(self.balance), required \(amount)"
         }
         post {
             self.balance == before(self.balance) - amount:
@@ -616,7 +616,7 @@ access(all) resource interface SafeVault {
     access(all) fun withdraw(amount: UFix64): @Vault {
         pre {
             amount > 0.0: "Amount must be positive"
-            self.balance >= amount: "Insufficient balance"
+            self.balance >= amount: "Insufficient balance: available \(self.balance), required \(amount)"
         }
         post {
             self.balance == before(self.balance) - amount:
@@ -740,7 +740,7 @@ access(all) resource interface Vault {
     access(all) fun withdraw(amount: UFix64): @Vault {
         pre {
             amount > 0.0: "Amount must be positive"
-            self.balance >= amount: "Insufficient balance"
+            self.balance >= amount: "Insufficient balance: available \(self.balance), required \(amount)"
         }
         post {
             self.balance == before(self.balance) - amount:

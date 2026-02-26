@@ -28,6 +28,9 @@ transaction() {
 
 // Getting any account
 let account = getAccount(0x01)
+
+// Getting an authorized reference to an account (Only usable in scripts)
+let authAccount = getAuthAccount<auth(Storage) &Account>(0x01)
 ```
 
 ### Account Components
@@ -71,7 +74,7 @@ transaction() {
 transaction() {
     prepare(signer: auth(LoadValue) &Account) {
         let resource <- signer.storage.load<@MyResource>(from: /storage/myResource)
-            ?? panic("Resource not found")
+            ?? panic("Resource of type @MyResource not found at path /storage/myResource")
 
         // Use resource
         destroy resource
@@ -85,7 +88,7 @@ transaction() {
     prepare(signer: auth(BorrowValue) &Account) {
         let resourceRef = signer.storage
             .borrow<&MyResource>(from: /storage/myResource)
-            ?? panic("Resource not found")
+            ?? panic("Could not borrow MyResource reference from /storage/myResource")
 
         // Use reference (resource stays in storage)
         resourceRef.someFunction()
@@ -98,7 +101,7 @@ transaction() {
 transaction() {
     prepare(signer: auth(CopyValue) &Account) {
         let data = signer.storage.copy<MyStruct>(from: /storage/myData)
-            ?? panic("Data not found")
+            ?? panic("Data of type MyStruct not found at path /storage/myData")
 
         // Original remains in storage
         log(data)
@@ -268,7 +271,7 @@ transaction(publicKey: String, hashAlgorithm: HashAlgorithm, weight: UFix64) {
 transaction(keyIndex: Int) {
     prepare(signer: auth(RevokeKey) &Account) {
         signer.keys.revoke(keyIndex: keyIndex)
-            ?? panic("Key not found")
+            ?? panic("Key not found at index \(keyIndex)")
     }
 }
 ```
@@ -277,7 +280,7 @@ transaction(keyIndex: Int) {
 ```cadence
 // Get specific key
 let key = account.keys.get(keyIndex: 0)
-    ?? panic("Key not found")
+    ?? panic("Key not found at index 0")
 
 log(key.publicKey)
 log(key.hashAlgorithm)
@@ -322,7 +325,7 @@ transaction(name: String, newCode: String) {
 transaction(name: String) {
     prepare(signer: auth(Contracts) &Account) {
         signer.contracts.remove(name: name)
-            ?? panic("Contract not found")
+            ?? panic("Contract with name \(name) not found in account \(signer.address)")
     }
 }
 ```
@@ -375,7 +378,7 @@ transaction(providerAddress: Address, name: String) {
         let cap = signer.inbox.claim<&MyResource>(
             name: name,
             provider: providerAddress
-        ) ?? panic("Capability not found in inbox")
+        ) ?? panic("Capability of type &MyResource not found in inbox")
 
         // Use capability
         if let ref = cap.borrow() {
@@ -525,7 +528,7 @@ transaction() {
     prepare(signer: auth(SaveValue, BorrowValue) &Account) {
         // Check if path is already used
         if signer.storage.borrow<&AnyResource>(from: /storage/resource) != nil {
-            panic("Path already in use")
+            panic("Path /storage/resource is already in use")
         }
 
         let resource <- createResource()
@@ -598,7 +601,7 @@ let cap = getAccount(address)
 if let ref = cap.borrow() {
     ref.someFunction()
 } else {
-    panic("Capability not available")
+    panic("Could not borrow MyInterface reference from /public/resource")
 }
 ```
 
@@ -610,7 +613,7 @@ if let ref = cap.borrow() {
 transaction() {
     prepare(signer: auth(BorrowValue, SaveValue) &Account) {
         if signer.storage.borrow<&AnyResource>(from: /storage/path) != nil {
-            panic("Path already occupied")
+            panic("Path /storage/path already occupied")
         }
 
         let resource <- createResource()
@@ -644,7 +647,7 @@ transaction(provider: Address) {
         let cap = signer.inbox.claim<&MyResource>(
             name: "myResource",
             provider: provider
-        ) ?? panic("Not found")
+        ) ?? panic("Capability named \"myResource\" not found in inbox from provider \(provider)")
 
         // Save capability
         signer.storage.save(cap, to: /storage/receivedCap)

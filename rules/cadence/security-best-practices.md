@@ -131,7 +131,7 @@ access(all) resource Vault {
     // Entitled withdraw - requires authorization
     access(Withdraw) fun withdraw(amount: UFix64): @{FungibleToken.Vault} {
         pre {
-            self.balance >= amount: "Insufficient balance"
+            self.balance >= amount: "Insufficient balance: available \(self.balance), required \(amount)"
         }
         self.balance = self.balance - amount
         return <- create Vault(balance: amount)
@@ -424,7 +424,7 @@ transaction() {
     prepare(signer: auth(BorrowValue) &Account) {
         // All account access happens here
         let vault = signer.storage.borrow<&Vault>(from: /storage/vault)
-            ?? panic("Vault not found")
+            ?? panic("Could not borrow Vault reference from /storage/vault")
 
         // Pass vault reference to function
         MyContract.safeFunction(vault: vault)
@@ -600,7 +600,7 @@ transaction(amount: UFix64, to: Address) {
     prepare(signer: auth(BorrowValue) &Account) {
         let vaultRef = signer.storage
             .borrow<auth(FungibleToken.Withdraw) &{FungibleToken.Vault}>(from: /storage/vault)
-            ?? panic("Vault not found")
+            ?? panic("Could not borrow FungibleToken Vault reference from /storage/vault")
 
         self.vault <- vaultRef.withdraw(amount: amount)
     }
@@ -608,7 +608,7 @@ transaction(amount: UFix64, to: Address) {
     execute {
         let receiver = getAccount(to)
             .capabilities.borrow<&{FungibleToken.Receiver}>(/public/receiver)
-            ?? panic("Receiver not found")
+            ?? panic("Could not borrow FungibleToken Receiver reference from /public/receiver")
 
         receiver.deposit(from: <-self.vault)
     }
@@ -632,7 +632,7 @@ transaction(amount: UFix64) {
     prepare(signer: auth(BorrowValue) &Account) {
         // Clear: borrowing from specific path
         let vault = signer.storage.borrow<&Vault>(from: /storage/vault)
-            ?? panic("Vault not found")
+            ?? panic("Could not borrow Vault reference from /storage/vault")
 
         // Clear: withdrawing specific amount
         let withdrawn <- vault.withdraw(amount: amount)

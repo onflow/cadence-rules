@@ -137,7 +137,7 @@ access(all) resource Vault {
     access(all) fun withdraw(amount: UFix64): @Vault {
         pre {
             amount > 0.0: "Amount must be positive"
-            amount <= self.balance: "Insufficient balance"
+            amount <= self.balance: "Insufficient balance: available \(self.balance), required \(amount)"
         }
 
         post {
@@ -193,12 +193,12 @@ transaction(amount: UFix64, recipient: Address) {
 
     prepare(signer: auth(BorrowValue) &Account) {
         self.vault = signer.storage.borrow<&Vault>(from: /storage/vault)
-            ?? panic("Vault not found")
+            ?? panic("Could not borrow Vault reference from /storage/vault")
     }
 
     pre {
         amount > 0.0: "Amount must be positive"
-        amount <= self.vault.balance: "Insufficient balance"
+        amount <= self.vault.balance: "Insufficient balance: available \(self.vault.balance), required \(amount)"
         recipient != signer.address: "Cannot send to yourself"
     }
 
@@ -219,7 +219,7 @@ transaction(amount: UFix64) {
 
     prepare(signer: auth(BorrowValue) &Account) {
         self.vault = signer.storage.borrow<&Vault>(from: /storage/vault)
-            ?? panic("Vault not found")
+            ?? panic("Could not borrow Vault reference from /storage/vault")
         self.startBalance = self.vault.balance
     }
 
@@ -249,11 +249,11 @@ transaction(amount: UFix64, recipient: Address) {
 
     prepare(signer: auth(BorrowValue) &Account) {
         self.senderVault = signer.storage.borrow<&Vault>(from: /storage/vault)
-            ?? panic("Sender vault not found")
+            ?? panic("Could not borrow Vault reference from /storage/vault")
 
         self.recipientVault = getAccount(recipient)
             .capabilities.borrow<&{VaultPublic}>(/public/vault)
-            ?? panic("Recipient vault not found")
+            ?? panic("Could not borrow VaultPublic reference from /public/vault")
 
         self.startSenderBalance = self.senderVault.balance
         self.startRecipientBalance = self.recipientVault.balance
@@ -261,7 +261,7 @@ transaction(amount: UFix64, recipient: Address) {
 
     pre {
         amount > 0.0: "Amount must be positive"
-        amount <= self.senderVault.balance: "Insufficient balance"
+        amount <= self.senderVault.balance: "Insufficient balance: available \(self.senderVault.balance), required \(amount)"
         recipient != signer.address: "Cannot send to yourself"
     }
 
@@ -335,7 +335,7 @@ access(all) resource interface Vault {
     access(all) fun withdraw(amount: UFix64): @Vault {
         pre {
             amount > 0.0: "Amount must be positive"
-            amount <= self.balance: "Insufficient balance"
+            amount <= self.balance: "Insufficient balance: available \(self.balance), required \(amount)"
         }
         post {
             result.balance == amount: "Incorrect amount"
@@ -503,7 +503,7 @@ pre {
 access(all) fun withdraw(amount: UFix64): @Vault {
     pre {
         amount > 0.0: "Amount must be positive"
-        self.balance >= amount: "Insufficient balance"
+        self.balance >= amount: "Insufficient balance: available \(self.balance), required \(amount)"
     }
 
     post {
