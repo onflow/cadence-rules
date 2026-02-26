@@ -75,7 +75,7 @@ prepare(signer: auth(BorrowValue, SaveValue, IssueStorageCapabilityController) &
 
     // ✅ CORRECT: Issuing capability
     self.cap = signer.capabilities.storage
-        .issue<&{MyInterface}>(/storage/myResource)
+        .issue<&MyResource>(/storage/myResource)
 
     // ✅ CORRECT: Saving resource
     let resource <- create MyResource()
@@ -462,7 +462,7 @@ prepare(signer: auth(BorrowValue, SaveValue) &Account) {
 prepare(signer: auth(BorrowValue, IssueStorageCapabilityController) &Account) {
     // Needs BorrowValue and capability issuance
     let cap = signer.capabilities.storage
-        .issue<&{MyInterface}>(/storage/myResource)
+        .issue<&MyResource>(/storage/myResource)
 }
 
 // ❌ WRONG: Over-privileged
@@ -714,7 +714,7 @@ transaction() {
 
         // Create and publish capability
         let cap = signer.capabilities.storage
-            .issue<&{MyContract.ResourcePublic}>(/storage/myResource)
+            .issue<&MyContract.Resource>(/storage/myResource)
         signer.capabilities.publish(cap, at: /public/myResource)
     }
 }

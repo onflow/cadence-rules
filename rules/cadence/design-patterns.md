@@ -434,11 +434,11 @@ transaction() {
 
         // Issue new capability
         let controller = signer.capabilities.storage
-            .issue<&{VaultPublic}>(/storage/vault)
+            .issue<&Vault>(/storage/vault)
 
         // Check if already published
         let existingCap = signer.capabilities
-            .borrow<&{VaultPublic}>(/public/vault)
+            .borrow<&{FungibleToken.Receiver}>(/public/vault)
 
         if existingCap == nil {
             // Publish capability

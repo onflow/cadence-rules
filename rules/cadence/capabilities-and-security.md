@@ -34,7 +34,7 @@ Grant access to objects at specific storage paths:
 ```cadence
 // Issue a storage capability
 let vaultCap = account.capabilities.storage
-    .issue<&{FungibleToken.Vault}>(/storage/flowTokenVault)
+    .issue<&FlowToken.Vault>(/storage/flowTokenVault)
 ```
 
 ### 2. Account Capabilities
@@ -56,7 +56,7 @@ Create new capabilities using capability controllers:
 ```cadence
 // Issue storage capability
 let controller = account.capabilities.storage
-    .issue<&{MyInterface}>(/storage/myResource)
+    .issue<&MyResource>(/storage/myResource)
 
 // Issue account capability
 let accountController = account.capabilities.account
@@ -110,16 +110,11 @@ account.capabilities.storage.delete(controller.capabilityID)
 
 ### Pattern 1: Minimal Exposure with Interface Types
 
-**Always publish the most restrictive interface possible.**
+**Only publish a capability to an object if you want some of the functionality to be publicly accessible. If you do, only publish the concrete type with no entitlements.**
 
 ```cadence
-// ✅ CORRECT: Expose only public interface
-access(all) resource interface VaultPublic {
-    access(all) view fun getBalance(): UFix64
-    access(all) fun deposit(from: @{FungibleToken.Vault})
-}
 
-access(all) resource Vault: VaultPublic {
+access(all) resource Vault {
     access(self) var balance: UFix64
 
     access(all) view fun getBalance(): UFix64 {
@@ -130,7 +125,7 @@ access(all) resource Vault: VaultPublic {
         // Implementation
     }
 
-    // Private withdraw function NOT exposed through interface
+    // Private withdraw function NOT exposed through concrete type
     access(Withdraw) fun withdraw(amount: UFix64): @{FungibleToken.Vault} {
         // Implementation
     }
@@ -138,12 +133,12 @@ access(all) resource Vault: VaultPublic {
 
 // Issue and publish restricted capability
 let vaultCap = account.capabilities.storage
-    .issue<&{VaultPublic}>(/storage/vault)  // Only VaultPublic interface
+    .issue<&Vault>(/storage/vault)  // Only Vault reference type
 account.capabilities.publish(vaultCap, at: /public/vaultReceiver)
 
-// ❌ WRONG: Exposing full resource
+// ❌ WRONG: Exposing full resource with entitlements
 let vaultCap = account.capabilities.storage
-    .issue<&Vault>(/storage/vault)  // Full access including withdraw!
+    .issue<auth(Withdraw) &Vault>(/storage/vault)  // Full access including withdraw!
 account.capabilities.publish(vaultCap, at: /public/vaultReceiver)  // SECURITY FLAW
 ```
 
@@ -181,7 +176,7 @@ let adminCap = account.capabilities.storage
 
 // Public capability (no entitlements)
 let publicCap = account.capabilities.storage
-    .issue<&{VaultPublic}>(/storage/vault)
+    .issue<&Vault>(/storage/vault)
 account.capabilities.publish(publicCap, at: /public/vault)
 ```
 
@@ -190,7 +185,7 @@ account.capabilities.publish(publicCap, at: /public/vault)
 ```cadence
 // Public capability - anyone can access
 let publicCap = account.capabilities.storage
-    .issue<&{PublicInterface}>(/storage/resource)
+    .issue<&ConcreteTypeWithNoEntitlements>(/storage/resource)
 account.capabilities.publish(publicCap, at: /public/resource)
 
 // Private capability - stored for owner's use only
@@ -208,7 +203,7 @@ account.storage.save(privateCap, to: /storage/resourceAdmin)
 ```cadence
 // ✅ CORRECT: Store controller for later management
 let controller = account.capabilities.storage
-    .issue<&{MyInterface}>(/storage/myResource)
+    .issue<&MyResource>(/storage/myResource)
 
 // Store controller for later use
 account.storage.save(controller, to: /storage/myResourceController)
@@ -221,7 +216,7 @@ if let controller = account.storage.borrow<&StorageCapabilityController>
 
 // ❌ WRONG: Losing reference to controller
 let cap = account.capabilities.storage
-    .issue<&{MyInterface}>(/storage/myResource)
+    .issue<&MyResource>(/storage/myResource)
 // No way to revoke this capability later!
 ```
 
@@ -232,7 +227,7 @@ Use tags to document capability purposes:
 ```cadence
 // Issue capability with descriptive tag
 let controller = account.capabilities.storage
-    .issue<&{FungibleToken.Receiver}>(/storage/flowTokenVault)
+    .issue<&FlowToken.Vault>(/storage/flowTokenVault)
 
 controller.setTag("FlowToken Receiver - Public Deposit Access")
 
@@ -342,7 +337,7 @@ Change storage paths for existing capability controllers:
 ```cadence
 // Create capability
 let controller = account.capabilities.storage
-    .issue<&{MyInterface}>(/storage/oldPath)
+    .issue<&MyResource>(/storage/oldPath)
 
 // Later: Move resource to new path
 let resource <- account.storage.load<@MyResource>(from: /storage/oldPath)
@@ -378,11 +373,7 @@ account.capabilities.publish(vaultCap, at: /public/vault)
 // ✅ FIX: Use interface and entitlements
 access(all) entitlement Withdraw
 
-access(all) resource interface VaultPublic {
-    access(all) view fun getBalance(): UFix64
-}
-
-access(all) resource Vault: VaultPublic {
+access(all) resource Vault {
     access(self) var balance: UFix64
 
     access(all) view fun getBalance(): UFix64 {
@@ -394,9 +385,9 @@ access(all) resource Vault: VaultPublic {
     }
 }
 
-// Publish restricted interface only
+// Publish concrete type only with no entitlements
 let publicCap = account.capabilities.storage
-    .issue<&{VaultPublic}>(/storage/vault)
+    .issue<&Vault>(/storage/vault)
 account.capabilities.publish(publicCap, at: /public/vault)
 ```
 
@@ -405,7 +396,7 @@ account.capabilities.publish(publicCap, at: /public/vault)
 ```cadence
 // ❌ PROBLEM: Issued capability but lost control
 let cap = account.capabilities.storage
-    .issue<&{AdminInterface}>(/storage/admin)
+    .issue<auth(Admin) &AdminResource>(/storage/admin)
 
 // Gave capability to employee
 employeeAccount.save(cap, to: /storage/adminAccess)
@@ -414,7 +405,7 @@ employeeAccount.save(cap, to: /storage/adminAccess)
 
 // ✅ FIX: Store controller and revoke when needed
 let controller = account.capabilities.storage
-    .issue<&{AdminInterface}>(/storage/admin)
+    .issue<auth(Admin) &AdminResource>(/storage/admin)
 
 // Store controller
 account.storage.save(controller, to: /storage/adminController)
@@ -456,7 +447,8 @@ if let ref = cap.borrow() {
 
 ### When Issuing Capabilities
 
-1. **Default to restrictive interface types**
+1. **Default to concrete type**
+2. **Ensure that concrete type has entitlements for any privileged functionality**
 2. **Use entitlements for privileged access**
 3. **Store capability controllers for management**
 4. **Add descriptive tags**
@@ -465,12 +457,7 @@ if let ref = cap.borrow() {
 ```cadence
 // AI should generate this pattern:
 
-// Step 1: Define interfaces
-access(all) resource interface PublicInterface {
-    access(all) view fun publicMethod(): String
-}
-
-access(all) resource MyResource: PublicInterface {
+access(all) resource MyResource {
     access(self) var data: String
 
     access(all) view fun publicMethod(): String {
@@ -484,7 +471,7 @@ access(all) resource MyResource: PublicInterface {
 
 // Step 2: Issue restrictive public capability
 let publicController = account.capabilities.storage
-    .issue<&{PublicInterface}>(/storage/myResource)
+    .issue<&MyResource>(/storage/myResource)
 publicController.setTag("Public read-only access")
 
 let publicCap = publicController.capability
@@ -526,7 +513,7 @@ access(all) fun transferResource(
         receiver.deposit(resource: <-resource)
     } else {
         // Handle failure - don't lose resource
-        log("Warning: Could not transfer resource to ".concat(to.toString()))
+        log("Warning: Could not transfer resource to \(to)")
 
         // Return to sender or destroy based on use case
         destroy resource
@@ -595,7 +582,7 @@ access(all) fun testCapabilityLifecycle() {
 
     // Issue capability
     let controller = account.capabilities.storage
-        .issue<&{MyInterface}>(/storage/myResource)
+        .issue<&MyResource>(/storage/myResource)
 
     let cap = controller.capability
 

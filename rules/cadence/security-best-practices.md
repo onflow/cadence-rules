@@ -160,7 +160,7 @@ prepare(signer: auth(IssueStorageCapabilityController, Capabilities) &Account) {
     if existingControllers.length == 0 {
         // Only issue if none exist
         let controller = signer.capabilities.storage
-            .issue<&{FungibleToken.Receiver}>(/storage/vault)
+            .issue<&Vault>(/storage/vault)
 
         controller.setTag("Public receiver capability")
     }
@@ -170,7 +170,7 @@ prepare(signer: auth(IssueStorageCapabilityController, Capabilities) &Account) {
 prepare(signer: auth(IssueStorageCapabilityController) &Account) {
     // Creates duplicate capabilities wastefully
     let controller = signer.capabilities.storage
-        .issue<&{FungibleToken.Receiver}>(/storage/vault)
+        .issue<&Vault>(/storage/vault)
 }
 ```
 
@@ -188,7 +188,7 @@ prepare(signer: auth(IssueStorageCapabilityController, PublishCapability) &Accou
     if existing == nil {
         // Only publish if doesn't exist
         let controller = signer.capabilities.storage
-            .issue<&{FungibleToken.Receiver}>(/storage/vault)
+            .issue<&Vault>(/storage/vault)
 
         let cap = controller.capability
         signer.capabilities.publish(cap, at: /public/receiver)
@@ -198,7 +198,7 @@ prepare(signer: auth(IssueStorageCapabilityController, PublishCapability) &Accou
 // ❌ WRONG: Publishing without checking
 prepare(signer: auth(IssueStorageCapabilityController, PublishCapability) &Account) {
     let controller = signer.capabilities.storage
-        .issue<&{FungibleToken.Receiver}>(/storage/vault)
+        .issue<&Vault>(/storage/vault)
 
     let cap = controller.capability
     signer.capabilities.publish(cap, at: /public/receiver)

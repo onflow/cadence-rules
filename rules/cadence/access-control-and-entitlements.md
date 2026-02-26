@@ -251,7 +251,7 @@ account.capabilities.publish(vaultCap, at: /public/vault)
 
 // ✅ CORRECT: Expose a non-entitled reference
 let vaultCap = account.capabilities.storage
-    .issue<&Vault>(/storage/vault)  // Only public interface
+    .issue<&Vault>(/storage/vault)  // Concrete type with no entitlements
 account.capabilities.publish(vaultCap, at: /public/vault)
 
 // ✅ ALSO CORRECT: Use entitled reference for privileged access,

@@ -148,7 +148,7 @@ transaction() {
     prepare(signer: auth(IssueStorageCapabilityController) &Account) {
         // Issue capability for storage path
         let controller = signer.capabilities.storage
-            .issue<&{MyInterface}>(/storage/myResource)
+            .issue<&MyResource>(/storage/myResource)
 
         controller.setTag("My capability for external access")
 
@@ -165,7 +165,7 @@ transaction() {
     prepare(signer: auth(IssueStorageCapabilityController, PublishCapability) &Account) {
         // Issue capability
         let controller = signer.capabilities.storage
-            .issue<&{PublicInterface}>(/storage/resource)
+            .issue<&Resource>(/storage/resource)
 
         // Publish for public access
         signer.capabilities.publish(controller.capability, at: /public/resource)
@@ -710,12 +710,12 @@ access(all) fun testCapabilities() {
 
     // Issue and publish capability
     let controller = account.capabilities.storage
-        .issue<&{MyInterface}>(/storage/test)
+        .issue<&MyResource>(/storage/test)
 
     account.capabilities.publish(controller.capability, at: /public/test)
 
     // Test getting capability
-    let cap = account.capabilities.get<&{MyInterface}>(/public/test)
+    let cap = account.capabilities.get<&MyResource>(/public/test)
     Test.expect(cap.check(), Test.equal(true))
 
     // Test borrowing

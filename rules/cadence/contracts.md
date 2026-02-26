@@ -69,7 +69,7 @@ access(all) contract TokenContract {
 
         // Create and publish public capability
         let publicCap = self.account.capabilities.storage
-            .issue<&{TokenPublic}>(/storage/mainVault)
+            .issue<&Vault>(/storage/mainVault)
         self.account.capabilities.publish(publicCap, at: /public/tokenVault)
     }
 }
@@ -100,7 +100,7 @@ init() {
 init() {
     // Setup public capabilities for common access
     let controller = self.account.capabilities.storage
-        .issue<&{PublicInterface}>(/storage/resource)
+        .issue<&Resource>(/storage/resource)
 
     self.account.capabilities.publish(
         controller.capability,

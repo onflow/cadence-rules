@@ -316,7 +316,7 @@ transaction() {
     prepare(signer: auth(IssueStorageCapabilityController, PublishCapability) &Account) {
         // Create capability
         let controller = signer.capabilities.storage
-            .issue<&{PublicInterface}>(/storage/resource)
+            .issue<&Resource>(/storage/resource)
 
         // Explicitly publish to public path
         signer.capabilities.publish(controller.capability, at: /public/resource)

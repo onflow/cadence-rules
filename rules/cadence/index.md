@@ -74,7 +74,7 @@ Rules that improve developer experience:
 ### 3. Capability-Based Security
 **Leverage Flow's security model**
 - Issue minimal-privilege capabilities
-- Use interface types to restrict access
+- Use entitlements to restrict capability access
 - Retain controllers for revocation
 - Regular audits and cleanup
 
