@@ -88,9 +88,11 @@ access(all) struct Record: Identifiable, Timestamped {
 ### Defining Resource Interfaces
 
 ```cadence
+access(all) entitlement Withdraw
+
 access(all) resource interface Provider {
     // Required function
-    access(all) fun withdraw(amount: UFix64): @Vault
+    access(Withdraw) fun withdraw(amount: UFix64): @Vault
 
     // Required field
     access(all) var balance: UFix64
@@ -107,7 +109,7 @@ access(all) resource interface Receiver {
 access(all) resource Vault: Provider, Receiver {
     access(all) var balance: UFix64
 
-    access(all) fun withdraw(amount: UFix64): @Vault {
+    access(Withdraw) fun withdraw(amount: UFix64): @Vault {
         pre {
             self.balance >= amount: "Insufficient balance: available \(self.balance), required \(amount)"
         }
@@ -133,6 +135,8 @@ access(all) resource Vault: Provider, Receiver {
 
 ```cadence
 access(all) contract interface FungibleToken {
+    access(all) entitlement Withdraw
+
     // Required events
     access(all) event TokensInitialized(initialSupply: UFix64)
     access(all) event TokensWithdrawn(amount: UFix64, from: Address?)
@@ -140,7 +144,7 @@ access(all) contract interface FungibleToken {
 
     // Required resource interfaces
     access(all) resource interface Provider {
-        access(all) fun withdraw(amount: UFix64): @Vault
+        access(Withdraw) fun withdraw(amount: UFix64): @Vault
     }
 
     access(all) resource interface Receiver {
@@ -155,7 +159,7 @@ access(all) contract interface FungibleToken {
     access(all) resource Vault: Provider, Receiver, Balance {
         access(all) var balance: UFix64
 
-        access(all) fun withdraw(amount: UFix64): @Vault
+        access(Withdraw) fun withdraw(amount: UFix64): @Vault
         access(all) fun deposit(from: @Vault)
     }
 
@@ -180,7 +184,7 @@ access(all) contract FlowToken: FungibleToken {
     access(all) resource Vault: FungibleToken.Provider, FungibleToken.Receiver, FungibleToken.Balance {
         access(all) var balance: UFix64
 
-        access(all) fun withdraw(amount: UFix64): @Vault {
+        access(Withdraw) fun withdraw(amount: UFix64): @Vault {
             self.balance = self.balance - amount
             emit TokensWithdrawn(amount: amount, from: self.owner?.address)
             return <- create Vault(balance: amount)
@@ -283,10 +287,12 @@ access(all) resource interface Collection {
 Interfaces can define conditions that implementations must satisfy:
 
 ```cadence
+access(all) entitlement Withdraw
+
 access(all) resource interface Vault {
     access(all) var balance: UFix64
 
-    access(all) fun withdraw(amount: UFix64): @Vault {
+    access(Withdraw) fun withdraw(amount: UFix64): @Vault {
         pre {
             self.balance >= amount: "Insufficient balance: available \(self.balance), required \(amount)"
         }
@@ -302,7 +308,7 @@ access(all) resource MyVault: Vault {
     access(all) var balance: UFix64
 
     // Must satisfy interface pre/post conditions
-    access(all) fun withdraw(amount: UFix64): @Vault {
+    access(Withdraw) fun withdraw(amount: UFix64): @Vault {
         // Interface pre-condition checked first
         // Additional implementation logic
         self.balance = self.balance - amount
@@ -429,9 +435,11 @@ access(all) resource MyResource: C {
 Intersection types represent values that implement specific interfaces:
 
 ```cadence
+access(all) entitlement Withdraw
+
 // Interface
 access(all) resource interface Provider {
-    access(all) fun withdraw(amount: UFix64): @Vault
+    access(Withdraw) fun withdraw(amount: UFix64): @Vault
 }
 
 // Function using intersection type
@@ -455,9 +463,11 @@ withdrawFromProvider(provider: provider2, amount: 10.0)
 ### Multiple Interfaces in Intersection
 
 ```cadence
+access(all) entitlement Withdraw
+
 // Multiple interfaces
 access(all) resource interface Provider {
-    access(all) fun withdraw(amount: UFix64): @Vault
+    access(Withdraw) fun withdraw(amount: UFix64): @Vault
 }
 
 access(all) resource interface Balance {
@@ -588,8 +598,10 @@ access(all) resource interface EverythingInterface {
 ```cadence
 // Standard interface
 access(all) contract interface FungibleTokenStandard {
+    access(all) entitlement Withdraw
+
     access(all) resource interface Provider {
-        access(all) fun withdraw(amount: UFix64): @Vault
+        access(Withdraw) fun withdraw(amount: UFix64): @Vault
     }
 
     access(all) resource interface Receiver {
@@ -610,10 +622,12 @@ access(all) contract CustomToken: FungibleTokenStandard { }
 **Define invariants in interface conditions.**
 
 ```cadence
+access(all) entitlement Withdraw
+
 access(all) resource interface SafeVault {
     access(all) var balance: UFix64
 
-    access(all) fun withdraw(amount: UFix64): @Vault {
+    access(Withdraw) fun withdraw(amount: UFix64): @Vault {
         pre {
             amount > 0.0: "Amount must be positive"
             self.balance >= amount: "Insufficient balance: available \(self.balance), required \(amount)"
@@ -674,9 +688,11 @@ access(all) fun processVault(vault: &Vault) {
 ```cadence
 // Generate interface
 access(all) contract interface TokenStandard {
+    access(all) entitlement Withdraw
+
     access(all) resource interface Vault {
         access(all) var balance: UFix64
-        access(all) fun withdraw(amount: UFix64): @Vault
+        access(Withdraw) fun withdraw(amount: UFix64): @Vault
         access(all) fun deposit(from: @Vault)
     }
 }
@@ -734,10 +750,12 @@ access(all) resource MyNFT: NFT {
 **Generate interfaces with safety conditions.**
 
 ```cadence
+access(all) entitlement Withdraw
+
 access(all) resource interface Vault {
     access(all) var balance: UFix64
 
-    access(all) fun withdraw(amount: UFix64): @Vault {
+    access(Withdraw) fun withdraw(amount: UFix64): @Vault {
         pre {
             amount > 0.0: "Amount must be positive"
             self.balance >= amount: "Insufficient balance: available \(self.balance), required \(amount)"

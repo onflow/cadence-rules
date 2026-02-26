@@ -348,8 +348,10 @@ access(all) contract Helpers {
 ```cadence
 // Interface contract (deployed first)
 access(all) contract interface IToken {
+    access(all) entitlement Withdraw
+
     access(all) resource interface Provider {
-        access(all) fun withdraw(amount: UFix64): @Vault
+        access(Withdraw) fun withdraw(amount: UFix64): @Vault
     }
 }
 
@@ -358,7 +360,7 @@ import IToken from 0x01
 
 access(all) contract Token: IToken {
     access(all) resource Vault: IToken.Provider {
-        access(all) fun withdraw(amount: UFix64): @Vault {
+        access(Withdraw) fun withdraw(amount: UFix64): @Vault {
             // Implementation
         }
     }

@@ -66,7 +66,7 @@ Post-conditions validate that:
 ### Syntax
 
 ```cadence
-access(all) fun withdraw(amount: UFix64): @Vault {
+access(Withdraw) fun withdraw(amount: UFix64): @Vault {
     post {
         result.balance == amount: "Withdrawn amount incorrect"
         self.balance == before(self.balance) - amount: "Balance not updated"
@@ -131,10 +131,12 @@ access(all) fun deposit(from: @Vault) {
 ### Basic Function Conditions
 
 ```cadence
+access(all) entitlement Withdraw
+
 access(all) resource Vault {
     access(self) var balance: UFix64
 
-    access(all) fun withdraw(amount: UFix64): @Vault {
+    access(Withdraw) fun withdraw(amount: UFix64): @Vault {
         pre {
             amount > 0.0: "Amount must be positive"
             amount <= self.balance: "Insufficient balance: available \(self.balance), required \(amount)"
@@ -329,10 +331,12 @@ access(all) fun myFunction() {
 Interfaces can define conditions that implementations inherit:
 
 ```cadence
+access(all) entitlement Withdraw
+
 access(all) resource interface Vault {
     access(all) var balance: UFix64
 
-    access(all) fun withdraw(amount: UFix64): @Vault {
+    access(Withdraw) fun withdraw(amount: UFix64): @Vault {
         pre {
             amount > 0.0: "Amount must be positive"
             amount <= self.balance: "Insufficient balance: available \(self.balance), required \(amount)"
@@ -349,7 +353,7 @@ access(all) resource MyVault: Vault {
     access(all) var balance: UFix64
 
     // Must satisfy interface conditions
-    access(all) fun withdraw(amount: UFix64): @Vault {
+    access(Withdraw) fun withdraw(amount: UFix64): @Vault {
         // Interface pre-condition checked automatically
         self.balance = self.balance - amount
         return <- create MyVault(balance: amount)
@@ -387,7 +391,7 @@ access(all) resource MyVault: Vault {
     access(all) var balance: UFix64
     access(all) var locked: Bool
 
-    access(all) fun withdraw(amount: UFix64): @Vault {
+    access(Withdraw) fun withdraw(amount: UFix64): @Vault {
         // Interface conditions checked
         pre {
             // Additional implementation condition
@@ -500,7 +504,7 @@ pre {
 ### Pattern 1: Balance Validation
 
 ```cadence
-access(all) fun withdraw(amount: UFix64): @Vault {
+access(Withdraw) fun withdraw(amount: UFix64): @Vault {
     pre {
         amount > 0.0: "Amount must be positive"
         self.balance >= amount: "Insufficient balance: available \(self.balance), required \(amount)"
@@ -602,7 +606,7 @@ access(all) fun transfer(amount: UFix64, to: Address) {
 **Verify important state changes.**
 
 ```cadence
-access(all) fun withdraw(amount: UFix64): @Vault {
+access(Withdraw) fun withdraw(amount: UFix64): @Vault {
     post {
         result.balance == amount: "Incorrect withdrawal"
         self.balance == before(self.balance) - amount: "Balance mismatch"

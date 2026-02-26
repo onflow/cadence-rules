@@ -331,6 +331,8 @@ access(all) resource VaultCollection {
 ### Working with Resource Dictionaries
 
 ```cadence
+access(all) entitlement Withdraw
+
 access(all) resource NFTCollection {
     access(self) var nfts: @{UInt64: NFT}
 
@@ -346,7 +348,7 @@ access(all) resource NFTCollection {
     }
 
     // Withdraw (remove and return)
-    access(all) fun withdraw(id: UInt64): @NFT {
+    access(Withdraw) fun withdraw(id: UInt64): @NFT {
         let nft <- self.nfts.remove(key: id)
             ?? panic("NFT with ID \(id) not found in collection")
         return <-nft

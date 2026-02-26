@@ -124,6 +124,8 @@ access(all) contract MyToken {
 import "NonFungibleToken"
 
 access(all) contract MyNFT {
+    access(all) entitlement Withdraw
+
     // Interface for public access
     access(all) resource interface NFTPublic {
         access(all) let id: UInt64
@@ -155,7 +157,7 @@ access(all) contract MyNFT {
             destroy old
         }
 
-        access(all) fun withdraw(id: UInt64): @NFT {
+        access(Withdraw) fun withdraw(id: UInt64): @NFT {
             return <- self.items.remove(key: id)
                 ?? panic("NFT with ID \(id) not found in collection")
         }
