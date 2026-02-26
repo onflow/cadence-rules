@@ -46,7 +46,7 @@ access(all) contract MyContract {
     access(all) var internalCounter: UInt64  // Anyone can read
     access(all) let adminAddress: Address    // Admin address exposed
 
-    access(all) fun validateState(): Bool {  // Internal helper exposed
+    access(all) view fun validateState(): Bool {  // Internal helper exposed
         return self.internalCounter > 0
     }
 

@@ -28,7 +28,7 @@ access(all) struct interface NamedEntity {
     access(all) let name: String
 
     // Required function
-    access(all) fun getName(): String
+    access(all) view fun getName(): String
 }
 ```
 
@@ -39,7 +39,7 @@ access(all) struct User: NamedEntity {
     access(all) let name: String
     access(all) let id: UInt64
 
-    access(all) fun getName(): String {
+    access(all) view fun getName(): String {
         return self.name
     }
 
@@ -55,12 +55,12 @@ access(all) struct User: NamedEntity {
 ```cadence
 access(all) struct interface Identifiable {
     access(all) let id: UInt64
-    access(all) fun getID(): UInt64
+    access(all) view fun getID(): UInt64
 }
 
 access(all) struct interface Timestamped {
     access(all) let createdAt: UFix64
-    access(all) fun getTimestamp(): UFix64
+    access(all) view fun getTimestamp(): UFix64
 }
 
 // Implement multiple interfaces
@@ -68,11 +68,11 @@ access(all) struct Record: Identifiable, Timestamped {
     access(all) let id: UInt64
     access(all) let createdAt: UFix64
 
-    access(all) fun getID(): UInt64 {
+    access(all) view fun getID(): UInt64 {
         return self.id
     }
 
-    access(all) fun getTimestamp(): UFix64 {
+    access(all) view fun getTimestamp(): UFix64 {
         return self.createdAt
     }
 
@@ -255,10 +255,10 @@ Interfaces can specify required functions:
 ```cadence
 access(all) resource interface Collection {
     // Required function signature
-    access(all) fun getIDs(): [UInt64]
+    access(all) view fun getIDs(): [UInt64]
 
     // Required function with parameters
-    access(all) fun borrowNFT(id: UInt64): &NFT?
+    access(all) view fun borrowNFT(id: UInt64): &NFT?
 
     // Required function with pre-condition
     access(all) fun deposit(token: @NFT) {
@@ -330,7 +330,7 @@ access(all) resource interface Counter {
     }
 
     // Default implementation
-    access(all) fun getCount(): UInt64 {
+    access(all) view fun getCount(): UInt64 {
         return self.count
     }
 }
@@ -379,21 +379,21 @@ Interfaces can inherit from other interfaces of the same kind:
 ```cadence
 // Base interface
 access(all) resource interface Base {
-    access(all) fun baseFunction(): String
+    access(all) view fun baseFunction(): String
 }
 
 // Derived interface
 access(all) resource interface Extended: Base {
-    access(all) fun extendedFunction(): String
+    access(all) view fun extendedFunction(): String
 }
 
 // Implementation must satisfy both
 access(all) resource MyResource: Extended {
-    access(all) fun baseFunction(): String {
+    access(all) view fun baseFunction(): String {
         return "base"
     }
 
-    access(all) fun extendedFunction(): String {
+    access(all) view fun extendedFunction(): String {
         return "extended"
     }
 }
@@ -403,22 +403,22 @@ access(all) resource MyResource: Extended {
 
 ```cadence
 access(all) resource interface A {
-    access(all) fun methodA(): String
+    access(all) view fun methodA(): String
 }
 
 access(all) resource interface B {
-    access(all) fun methodB(): String
+    access(all) view fun methodB(): String
 }
 
 access(all) resource interface C: A, B {
-    access(all) fun methodC(): String
+    access(all) view fun methodC(): String
 }
 
 // Must implement all methods
 access(all) resource MyResource: C {
-    access(all) fun methodA(): String { return "A" }
-    access(all) fun methodB(): String { return "B" }
-    access(all) fun methodC(): String { return "C" }
+    access(all) view fun methodA(): String { return "A" }
+    access(all) view fun methodB(): String { return "B" }
+    access(all) view fun methodC(): String { return "C" }
 }
 ```
 
@@ -484,14 +484,14 @@ access(all) fun getBalanceAndWithdraw(
 // Interface
 access(all) resource interface Named {
     access(all) let name: String
-    access(all) fun getName(): String
+    access(all) view fun getName(): String
 }
 
 // ❌ DOES NOT implement Named (missing declaration)
 access(all) resource Person {
     access(all) let name: String
 
-    access(all) fun getName(): String {
+    access(all) view fun getName(): String {
         return self.name
     }
 
@@ -504,7 +504,7 @@ access(all) resource Person {
 access(all) resource Person: Named {
     access(all) let name: String
 
-    access(all) fun getName(): String {
+    access(all) view fun getName(): String {
         return self.name
     }
 
@@ -522,14 +522,14 @@ Contracts and resources can contain nested interfaces:
 access(all) contract MyContract {
     // Nested resource interface
     access(all) resource interface VaultPublic {
-        access(all) fun getBalance(): UFix64
+        access(all) view fun getBalance(): UFix64
     }
 
     // Resource using nested interface
     access(all) resource Vault: VaultPublic {
         access(self) var balance: UFix64
 
-        access(all) fun getBalance(): UFix64 {
+        access(all) view fun getBalance(): UFix64 {
             return self.balance
         }
 
@@ -576,7 +576,7 @@ access(all) resource interface EverythingInterface {
     access(all) let rarity: String
     access(all) fun transfer(to: Address)
     access(all) fun updateMetadata(key: String, value: String)
-    access(all) fun calculateValue(): UFix64
+    access(all) view fun calculateValue(): UFix64
     // Too many responsibilities
 }
 ```
@@ -635,17 +635,17 @@ access(all) resource interface Collection {
     access(all) var items: @{UInt64: Item}
 
     // Default implementation
-    access(all) fun getIDs(): [UInt64] {
+    access(all) view fun getIDs(): [UInt64] {
         return self.items.keys
     }
 
     // Default implementation
-    access(all) fun getLength(): Int {
+    access(all) view fun getLength(): Int {
         return self.items.length
     }
 
     // Required implementation (no default)
-    access(all) fun borrowItem(id: UInt64): &Item?
+    access(all) view fun borrowItem(id: UInt64): &Item?
 }
 ```
 
@@ -712,14 +712,14 @@ access(all) fun transfer(
 // Interface defines requirements
 access(all) resource interface NFT {
     access(all) let id: UInt64
-    access(all) fun getID(): UInt64
+    access(all) view fun getID(): UInt64
 }
 
 // Generated implementation must include all
 access(all) resource MyNFT: NFT {
     access(all) let id: UInt64  // Required
 
-    access(all) fun getID(): UInt64 {  // Required
+    access(all) view fun getID(): UInt64 {  // Required
         return self.id
     }
 

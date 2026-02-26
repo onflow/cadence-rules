@@ -24,7 +24,7 @@ access(all) contract MyContract {
     access(self) var totalSupply: UInt64
 
     // Functions
-    access(all) fun getTotalSupply(): UInt64 {
+    access(all) view fun getTotalSupply(): UInt64 {
         return self.totalSupply
     }
 
@@ -183,18 +183,26 @@ access(all) contract FullExample {
 
 ### Defining Contract Interfaces
 
-Contract interfaces establish behavioral contracts that implementing contracts must follow:
+Contract interfaces establish behavioral contracts that implementing contracts must follow.
+Events and interfaces in contract interfaces are their own definition and are not required
+to be implemented by the implementing contract. Concrete type definitions are not allowed
+in contract interfaces.
+
+Any fields and functions in a contract interface must be implemented by the implementing contract:
 
 ```cadence
 // Define interface
 access(all) contract interface TokenInterface {
-    // Required events
+
+    access(all) entitlement Withdraw
+
+    // Events that code in the interface can emit, but are not required by implementing contracts
     access(all) event TokensInitialized(initialSupply: UFix64)
     access(all) event TokensWithdrawn(amount: UFix64, from: Address?)
 
-    // Required resources/structs/interfaces
+    // Interfaces that other code can implement, but the implementing contract is not required to have
     access(all) resource interface Provider {
-        access(all) fun withdraw(amount: UFix64): @Vault
+        access(Withdraw) fun withdraw(amount: UFix64): @Vault
     }
 
     access(all) resource interface Receiver {
@@ -205,7 +213,7 @@ access(all) contract interface TokenInterface {
     access(all) var totalSupply: UFix64
 
     // Required functions
-    access(all) fun getTotalSupply(): UFix64
+    access(all) view fun getTotalSupply(): UFix64
 }
 ```
 
@@ -214,15 +222,11 @@ access(all) contract interface TokenInterface {
 ```cadence
 // Implement interface
 access(all) contract MyToken: TokenInterface {
-    // Must implement all required events
-    access(all) event TokensInitialized(initialSupply: UFix64)
-    access(all) event TokensWithdrawn(amount: UFix64, from: Address?)
 
-    // Must implement all required types
     access(all) resource Vault: TokenInterface.Provider, TokenInterface.Receiver {
         access(self) var balance: UFix64
 
-        access(all) fun withdraw(amount: UFix64): @Vault {
+        access(Withdraw) fun withdraw(amount: UFix64): @Vault {
             self.balance = self.balance - amount
             return <- create Vault(balance: amount)
         }
@@ -241,7 +245,7 @@ access(all) contract MyToken: TokenInterface {
     access(all) var totalSupply: UFix64
 
     // Must implement all required functions
-    access(all) fun getTotalSupply(): UFix64 {
+    access(all) view fun getTotalSupply(): UFix64 {
         return self.totalSupply
     }
 
@@ -249,17 +253,6 @@ access(all) contract MyToken: TokenInterface {
         self.totalSupply = 1000.0
         emit TokensInitialized(initialSupply: 1000.0)
     }
-}
-```
-
-### Nested Interface Access
-
-Implementing contracts can reference nested interfaces through the interface name:
-
-```cadence
-// In contract implementation
-access(all) resource MyVault: TokenInterface.Provider, TokenInterface.Receiver {
-    // Implementation
 }
 ```
 
@@ -344,7 +337,7 @@ access(all) contract Core {
 
 // Helper contract with utilities
 access(all) contract Helpers {
-    access(all) fun utilityFunction(): String {
+    access(all) view fun utilityFunction(): String {
         return "helper"
     }
 }
@@ -463,7 +456,7 @@ access(all) contract Everything {
 // Interface defines contract
 access(all) contract interface FungibleToken {
     access(all) resource interface Provider {
-        access(all) fun withdraw(amount: UFix64): @Vault
+        access(Withdraw) fun withdraw(amount: UFix64): @Vault
     }
 
     access(all) resource interface Receiver {
@@ -571,10 +564,9 @@ access(all) contract SecureContract {
 ### Safe Upgrade Guidelines
 
 1. **Preserve field order and types**
-2. **Only add new fields at the end**
-3. **Don't remove or rename existing fields**
-4. **Add new functions freely**
-5. **Modify function implementations carefully**
+2. **Don't remove or rename existing fields**
+3. **Add new functions freely**
+4. **Modify function implementations carefully**
 
 ```cadence
 // Original contract
@@ -596,7 +588,6 @@ access(all) contract MyContract {
 access(all) contract MyContract {
     access(all) var fieldA: String  // Unchanged
     access(all) var fieldB: UInt64  // Unchanged
-    access(all) var fieldC: Bool    // New field added at end
 
     access(all) fun functionA() {
         // Modified implementation OK
@@ -609,15 +600,15 @@ access(all) contract MyContract {
     init() {
         self.fieldA = "initial"
         self.fieldB = 0
-        self.fieldC = false  // Initialize new field
     }
 }
 
-// ❌ DANGEROUS upgrade
+// ❌ Upgrade that is NOT ALLOWED
 access(all) contract MyContract {
     access(all) var fieldB: UInt64  // Reordered - BAD
     access(all) var fieldA: UFix64  // Changed type - BAD
-    // fieldC removed - BAD
+    // fieldC added - BAD
+    access(all) var fieldA: UFix64
 
     init() {
         self.fieldA = 0.0
@@ -657,14 +648,14 @@ access(all) contract MyContract {
 // Generate interface first
 access(all) contract interface StandardInterface {
     access(all) resource interface Resource {
-        access(all) fun commonFunction(): String
+        access(all) view fun commonFunction(): String
     }
 }
 
 // Then generate implementations
 access(all) contract Implementation: StandardInterface {
     access(all) resource MyResource: StandardInterface.Resource {
-        access(all) fun commonFunction(): String {
+        access(all) view fun commonFunction(): String {
             return "implemented"
         }
     }
@@ -686,22 +677,6 @@ access(all) contract MyContract {
         self.counter = 0
         self.name = "MyContract"
         self.active = true
-    }
-}
-```
-
-### Rule 4: Emit Initialization Event
-
-**Signal successful deployment with an event.**
-
-```cadence
-access(all) contract MyContract {
-    access(all) event ContractInitialized(address: Address)
-
-    init() {
-        // Setup...
-
-        emit ContractInitialized(address: self.account.address)
     }
 }
 ```

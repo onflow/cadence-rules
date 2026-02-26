@@ -13,11 +13,11 @@
 ```cadence
 // ❌ ANTI-PATTERN: Magic numbers
 access(all) contract BadContract {
-    access(all) fun calculateFee(amount: UFix64): UFix64 {
+    access(all) view fun calculateFee(amount: UFix64): UFix64 {
         return amount * 0.05  // What is 0.05?
     }
 
-    access(all) fun isValidAmount(amount: UFix64): Bool {
+    access(all) view fun isValidAmount(amount: UFix64): Bool {
         return amount >= 10.0 && amount <= 1000.0  // Magic numbers
     }
 }
@@ -29,11 +29,11 @@ access(all) contract GoodContract {
     access(all) let MINIMUM_AMOUNT: UFix64
     access(all) let MAXIMUM_AMOUNT: UFix64
 
-    access(all) fun calculateFee(amount: UFix64): UFix64 {
+    access(all) view fun calculateFee(amount: UFix64): UFix64 {
         return amount * self.FEE_PERCENTAGE
     }
 
-    access(all) fun isValidAmount(amount: UFix64): Bool {
+    access(all) view fun isValidAmount(amount: UFix64): Bool {
         return amount >= self.MINIMUM_AMOUNT && amount <= self.MAXIMUM_AMOUNT
     }
 
@@ -122,7 +122,7 @@ access(all) contract NFTContract {
         access(self) let metadata: {String: String}
 
         // Generate report from resource
-        access(all) fun generateReport(): NFTReport {
+        access(all) view fun generateReport(): NFTReport {
             return NFTReport(
                 id: self.id,
                 owner: self.owner?.address ?? panic("No owner"),
@@ -578,12 +578,12 @@ access(all) resource Collection {
     }
 
     // Borrow reference
-    access(all) fun borrowItem(id: UInt64): &Item? {
+    access(all) view fun borrowItem(id: UInt64): &Item? {
         return &self.items[id] as &Item?
     }
 
     // Get IDs
-    access(all) fun getIDs(): [UInt64] {
+    access(all) view fun getIDs(): [UInt64] {
         return self.items.keys
     }
 

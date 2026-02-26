@@ -251,11 +251,11 @@ References are covariant - `&T` is a subtype of `&U` when `T` is a subtype of `U
 
 ```cadence
 access(all) resource interface Animal {
-    access(all) fun makeSound(): String
+    access(all) view fun makeSound(): String
 }
 
 access(all) resource Dog: Animal {
-    access(all) fun makeSound(): String {
+    access(all) view fun makeSound(): String {
         return "Woof"
     }
 
@@ -369,14 +369,14 @@ transaction() {
 
 ```cadence
 access(all) resource interface VaultPublic {
-    access(all) fun getBalance(): UFix64
+    access(all) view fun getBalance(): UFix64
     access(all) fun deposit(from: @{FungibleToken.Vault})
 }
 
 access(all) resource Vault: VaultPublic {
     access(self) var balance: UFix64
 
-    access(all) fun getBalance(): UFix64 {
+    access(all) view fun getBalance(): UFix64 {
         return self.balance
     }
 

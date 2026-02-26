@@ -83,7 +83,7 @@ access(all) fun withdraw(amount: UFix64): @Vault {
 In post-conditions, `result` refers to the function's return value:
 
 ```cadence
-access(all) fun calculateTotal(values: [UFix64]): UFix64 {
+access(all) view fun calculateTotal(values: [UFix64]): UFix64 {
     post {
         result >= 0.0: "Total cannot be negative"
         result <= UFix64.max: "Total overflow"

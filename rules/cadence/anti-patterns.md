@@ -123,7 +123,7 @@ access(all) contract BadContract {
     access(all) let adminAddress: Address
 
     // Exposed helper function
-    access(all) fun internalHelper(): String {
+    access(all) view fun internalHelper(): String {
         return "internal data"
     }
 

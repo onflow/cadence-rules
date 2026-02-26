@@ -80,14 +80,14 @@ access(all) resource NFT {
 ```cadence
 access(all) resource interface NFTPublic {
     access(all) let id: UInt64
-    access(all) fun getMetadata(): {String: String}
+    access(all) view fun getMetadata(): {String: String}
 }
 
 access(all) resource NFT: NFTPublic {
     access(all) let id: UInt64
     access(self) var metadata: {String: String}
 
-    access(all) fun getMetadata(): {String: String} {
+    access(all) view fun getMetadata(): {String: String} {
         return self.metadata
     }
 
@@ -439,7 +439,7 @@ log(nft.uuid)  // Unique across all resources
 
 ```cadence
 access(all) resource Vault {
-    access(all) fun getOwner(): Address? {
+    access(all) view fun getOwner(): Address? {
         return self.owner?.address
     }
 }
