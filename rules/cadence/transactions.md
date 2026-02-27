@@ -36,7 +36,7 @@ transaction(amount: UFix64, recipient: Address) {
     }
 
     pre {
-        amount > 0.0: "Amount must be positive"
+        amount > 0.0: "Amount must be positive: received \(amount)"
     }
 
     execute {
@@ -45,7 +45,7 @@ transaction(amount: UFix64, recipient: Address) {
     }
 
     post {
-        self.senderVault.balance >= 0.0: "Sender balance cannot be negative"
+        self.senderVault.balance >= 0.0: "Sender balance cannot be negative: current balance is \(self.senderVault.balance)"
     }
 }
 ```
@@ -120,8 +120,8 @@ prepare(
 
 ```cadence
 pre {
-    amount > 0.0: "Amount must be positive"
-    amount <= 1000.0: "Amount exceeds maximum"
+    amount > 0.0: "Amount must be positive: received \(amount)"
+    amount <= 1000.0: "Amount exceeds maximum of 1000.0: received \(amount)"
     recipient != signer.address: "Cannot send to yourself"
 }
 ```
@@ -130,9 +130,9 @@ pre {
 
 ```cadence
 pre {
-    amount > 0.0: "Amount must be positive"
-    self.senderVault.balance >= amount: "Insufficient balance"
-    self.recipientReceiver != nil: "Invalid recipient"
+    amount > 0.0: "Amount must be positive: received \(amount)"
+    self.senderVault.balance >= amount: "Insufficient balance: available \(self.senderVault.balance), required \(amount)"
+    self.recipientReceiver != nil: "Recipient does not have a valid receiver capability"
 }
 ```
 
@@ -182,10 +182,10 @@ execute {
 ```cadence
 post {
     self.recipientReceiver.balance > before(self.recipientReceiver.balance):
-        "Recipient balance did not increase"
+        "Recipient balance did not increase: current balance is \(self.recipientReceiver.balance)"
 
     self.senderVault.balance == before(self.senderVault.balance) - amount:
-        "Sender balance incorrect"
+        "Sender balance not decreased by \(amount): current balance is \(self.senderVault.balance)"
 }
 ```
 
@@ -301,7 +301,7 @@ transaction(amount: UFix64) {
     post {
         // Reference fields
         self.senderVault.balance == self.startBalance - amount:
-            "Balance mismatch"
+            "Sender balance not decreased by transfer amount \(amount): current balance is \(self.senderVault.balance)"
     }
 }
 ```
@@ -371,14 +371,14 @@ prepare(signer: auth(BorrowValue) &Account) {
 }
 
 pre {
-    amount > 0.0: "Amount must be positive"
-    amount <= 1000.0: "Amount too large"
+    amount > 0.0: "Amount must be positive: received \(amount)"
+    amount <= 1000.0: "Amount exceeds maximum of 1000.0: received \(amount)"
 }
 
 // ❌ LESS IDEAL: Validation in prepare
 prepare(signer: auth(BorrowValue) &Account) {
-    assert(amount > 0.0, message: "Amount must be positive")
-    assert(amount <= 1000.0, message: "Amount too large")
+    assert(amount > 0.0, message: "Amount must be positive: received \(amount)")
+    assert(amount <= 1000.0, message: "Amount exceeds maximum of 1000.0: received \(amount)")
 
     self.vault = signer.storage.borrow<&{FungibleToken.Vault}>(from: /storage/vault)
         ?? panic("Could not borrow FungibleToken Vault reference from /storage/vault")
@@ -392,7 +392,7 @@ prepare(signer: auth(BorrowValue) &Account) {
 ```cadence
 post {
     self.vault.balance == before(self.vault.balance) - amount:
-        "Balance change incorrect"
+        "Balance not decreased by \(amount): current balance is \(self.vault.balance)"
 
     result != nil: "Operation must return a result"
 }
@@ -413,7 +413,7 @@ transaction(amount: UFix64) {
     }
 
     pre {
-        amount > 0.0: "Amount must be positive"
+        amount > 0.0: "Amount must be positive: received \(amount)"
     }
 
     execute {
@@ -422,7 +422,7 @@ transaction(amount: UFix64) {
     }
 
     post {
-        self.vault.balance >= 0.0: "Balance cannot be negative"
+        self.vault.balance >= 0.0: "Balance cannot be negative: current balance is \(self.vault.balance)"
     }
 }
 
@@ -432,12 +432,12 @@ transaction(amount: UFix64) {
         let vault = signer.storage.borrow<&{FungibleToken.Vault}>(from: /storage/vault)
             ?? panic("Could not borrow FungibleToken Vault reference from /storage/vault")
 
-        assert(amount > 0.0, message: "Amount must be positive")
+        assert(amount > 0.0, message: "Amount must be positive: received \(amount)")
 
         let withdrawn <- vault.withdraw(amount: amount)
         destroy withdrawn
 
-        assert(vault.balance >= 0.0, message: "Balance cannot be negative")
+        assert(vault.balance >= 0.0, message: "Balance cannot be negative: current balance is \(vault.balance)")
     }
 }
 ```
@@ -590,7 +590,7 @@ transaction(amount: UFix64) {
     }
 
     pre {
-        amount > 0.0: "Amount must be positive"
+        amount > 0.0: "Amount must be positive: received \(amount)"
     }
 
     execute {
@@ -599,7 +599,7 @@ transaction(amount: UFix64) {
     }
 
     post {
-        self.vault.balance >= 0.0: "Balance non-negative"
+        self.vault.balance >= 0.0: "Balance cannot be negative: current balance is \(self.vault.balance)"
     }
 }
 ```
@@ -626,7 +626,7 @@ prepare(signer: auth(BorrowValue, SaveValue) &Account) {
 
 ```cadence
 pre {
-    amount > 0.0: "Amount must be positive"
+    amount > 0.0: "Amount must be positive: received \(amount)"
     recipient != signer.address: "Cannot send to yourself"
 }
 ```
@@ -638,7 +638,7 @@ pre {
 ```cadence
 post {
     result != nil: "Transaction must produce result"
-    self.balance >= 0.0: "Balance cannot be negative"
+    self.balance >= 0.0: "Balance cannot be negative: current balance is \(self.balance)"
 }
 ```
 

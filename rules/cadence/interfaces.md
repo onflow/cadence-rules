@@ -129,152 +129,7 @@ access(all) resource Vault: Provider, Receiver {
 }
 ```
 
-## Contract Interfaces
-
-### Defining Contract Interfaces
-
-```cadence
-access(all) contract interface FungibleToken {
-    access(all) entitlement Withdraw
-
-    // Required events
-    access(all) event TokensInitialized(initialSupply: UFix64)
-    access(all) event TokensWithdrawn(amount: UFix64, from: Address?)
-    access(all) event TokensDeposited(amount: UFix64, to: Address?)
-
-    // Required resource interfaces
-    access(all) resource interface Provider {
-        access(Withdraw) fun withdraw(amount: UFix64): @Vault
-    }
-
-    access(all) resource interface Receiver {
-        access(all) fun deposit(from: @Vault)
-    }
-
-    access(all) resource interface Balance {
-        access(all) var balance: UFix64
-    }
-
-    // Required resource type (using nested interfaces)
-    access(all) resource Vault: Provider, Receiver, Balance {
-        access(all) var balance: UFix64
-
-        access(Withdraw) fun withdraw(amount: UFix64): @Vault
-        access(all) fun deposit(from: @Vault)
-    }
-
-    // Required fields
-    access(all) var totalSupply: UFix64
-
-    // Required functions
-    access(all) fun createEmptyVault(): @Vault
-}
-```
-
-### Implementing Contract Interfaces
-
-```cadence
-access(all) contract FlowToken: FungibleToken {
-    // Must implement all required events
-    access(all) event TokensInitialized(initialSupply: UFix64)
-    access(all) event TokensWithdrawn(amount: UFix64, from: Address?)
-    access(all) event TokensDeposited(amount: UFix64, to: Address?)
-
-    // Must implement required resource
-    access(all) resource Vault: FungibleToken.Provider, FungibleToken.Receiver, FungibleToken.Balance {
-        access(all) var balance: UFix64
-
-        access(Withdraw) fun withdraw(amount: UFix64): @Vault {
-            self.balance = self.balance - amount
-            emit TokensWithdrawn(amount: amount, from: self.owner?.address)
-            return <- create Vault(balance: amount)
-        }
-
-        access(all) fun deposit(from: @Vault) {
-            let vault <- from as! @FlowToken.Vault
-            self.balance = self.balance + vault.balance
-            emit TokensDeposited(amount: vault.balance, to: self.owner?.address)
-            destroy vault
-        }
-
-        init(balance: UFix64) {
-            self.balance = balance
-        }
-    }
-
-    // Must implement required fields
-    access(all) var totalSupply: UFix64
-
-    // Must implement required functions
-    access(all) fun createEmptyVault(): @Vault {
-        return <- create Vault(balance: 0.0)
-    }
-
-    init() {
-        self.totalSupply = 1000.0
-        emit TokensInitialized(initialSupply: self.totalSupply)
-    }
-}
-```
-
-## Interface Requirements
-
-### Field Requirements
-
-Interfaces can specify required fields:
-
-```cadence
-access(all) resource interface NFTPublic {
-    // Required field - must be public
-    access(all) let id: UInt64
-
-    // Required field with specific type
-    access(all) let metadata: {String: String}
-}
-
-// Implementation must match exactly
-access(all) resource NFT: NFTPublic {
-    access(all) let id: UInt64
-    access(all) let metadata: {String: String}
-
-    init(id: UInt64, metadata: {String: String}) {
-        self.id = id
-        self.metadata = metadata
-    }
-}
-```
-
 **Rules**:
-- Interface fields must be `access(all)`
-- Implementation fields must match:
-  - Name
-  - Type
-  - Variable vs constant (`var` vs `let`)
-- Implementation can be more permissive (but not less)
-
-### Function Requirements
-
-Interfaces can specify required functions:
-
-```cadence
-access(all) resource interface Collection {
-    // Required function signature
-    access(all) view fun getIDs(): [UInt64]
-
-    // Required function with parameters
-    access(all) view fun borrowNFT(id: UInt64): &NFT?
-
-    // Required function with pre-condition
-    access(all) fun deposit(token: @NFT) {
-        pre {
-            token.id != nil: "Token must have ID"
-        }
-    }
-}
-```
-
-**Rules**:
-- Interface functions must be `access(all)` (minimum)
 - Implementation must match:
   - Function name
   - Parameter names and types
@@ -298,7 +153,7 @@ access(all) resource interface Vault {
         }
         post {
             self.balance == before(self.balance) - amount:
-                "Balance not updated correctly"
+                "Balance not decreased by withdrawal amount \(amount): current balance is \(self.balance)"
         }
     }
 }
@@ -619,7 +474,7 @@ access(all) contract CustomToken: FungibleTokenStandard { }
 
 ### Practice 3: Include Pre/Post Conditions
 
-**Define invariants in interface conditions.**
+**Define invariants in interface conditions for state changing functions**
 
 ```cadence
 access(all) entitlement Withdraw
@@ -629,12 +484,12 @@ access(all) resource interface SafeVault {
 
     access(Withdraw) fun withdraw(amount: UFix64): @Vault {
         pre {
-            amount > 0.0: "Amount must be positive"
+            amount > 0.0: "Amount must be positive: received \(amount)"
             self.balance >= amount: "Insufficient balance: available \(self.balance), required \(amount)"
         }
         post {
             self.balance == before(self.balance) - amount:
-                "Balance not updated correctly"
+                "Balance not decreased by withdrawal amount \(amount): current balance is \(self.balance)"
         }
     }
 }
@@ -757,12 +612,12 @@ access(all) resource interface Vault {
 
     access(Withdraw) fun withdraw(amount: UFix64): @Vault {
         pre {
-            amount > 0.0: "Amount must be positive"
+            amount > 0.0: "Amount must be positive: received \(amount)"
             self.balance >= amount: "Insufficient balance: available \(self.balance), required \(amount)"
         }
         post {
             self.balance == before(self.balance) - amount:
-                "Balance mismatch"
+                "Balance not decreased by withdrawal amount \(amount): current balance is \(self.balance)"
         }
     }
 }

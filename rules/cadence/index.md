@@ -200,8 +200,8 @@ transaction(amount: UFix64, recipient: Address) {
     }
 
     pre {
-        amount > 0.0: "Amount must be positive"
-        self.senderVault.balance >= amount: "Insufficient balance"
+        amount > 0.0: "Amount must be positive: received \(amount)"
+        self.senderVault.balance >= amount: "Insufficient balance: available \(self.senderVault.balance), required \(amount)"
     }
 
     execute {
@@ -211,7 +211,7 @@ transaction(amount: UFix64, recipient: Address) {
 
     post {
         self.senderVault.balance == self.startBalance - amount:
-            "Sender balance incorrect"
+            "Sender balance not decreased by transfer amount \(amount): current balance is \(self.senderVault.balance)"
     }
 }
 ```
