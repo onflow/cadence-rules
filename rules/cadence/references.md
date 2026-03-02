@@ -365,54 +365,12 @@ transaction() {
 }
 ```
 
-### Pattern 3: Interface References
-
-```cadence
-access(all) resource interface VaultPublic {
-    access(all) view fun getBalance(): UFix64
-    access(all) fun deposit(from: @{FungibleToken.Vault})
-}
-
-access(all) resource Vault: VaultPublic {
-    access(self) var balance: UFix64
-
-    access(all) view fun getBalance(): UFix64 {
-        return self.balance
-    }
-
-    access(all) fun deposit(from: @{FungibleToken.Vault}) {
-        // Implementation
-    }
-
-    access(Withdraw) fun withdraw(amount: UFix64): @Vault {
-        // Privileged operation
-    }
-
-    init(balance: UFix64) {
-        self.balance = balance
-    }
-}
-
-// Reference to interface hides privileged operations
-transaction() {
-    execute {
-        let vaultRef = getAccount(address)
-            .capabilities.borrow<&{VaultPublic}>(/public/vault)
-            ?? panic("Could not borrow VaultPublic reference from /public/vault")
-
-        vaultRef.getBalance()  // OK
-        vaultRef.deposit(from: <-vault)  // OK
-        // vaultRef.withdraw(amount: 10.0)  // COMPILE ERROR: not in interface
-    }
-}
-```
-
 ### Pattern 4: Capability Borrowing
 
 ```cadence
 // Most common pattern - borrow from capability
 let cap = getAccount(address)
-    .capabilities.get<&{VaultPublic}>(/public/vault)
+    .capabilities.get<&Vault>(/public/vault)
 
 if let vaultRef = cap.borrow() {
     // Use reference within scope

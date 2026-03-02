@@ -75,29 +75,6 @@ access(all) resource NFT {
 }
 ```
 
-### Resource with Interfaces
-
-```cadence
-access(all) resource interface NFTPublic {
-    access(all) let id: UInt64
-    access(all) view fun getMetadata(): {String: String}
-}
-
-access(all) resource NFT: NFTPublic {
-    access(all) let id: UInt64
-    access(self) var metadata: {String: String}
-
-    access(all) view fun getMetadata(): {String: String} {
-        return self.metadata
-    }
-
-    init(id: UInt64, metadata: {String: String}) {
-        self.id = id
-        self.metadata = metadata
-    }
-}
-```
-
 ## Resource Creation
 
 ### Using the `create` Keyword
@@ -221,25 +198,20 @@ if shouldKeep {
 }
 ```
 
-### Destroy Events
+### Burner Contract
 
-Resources can emit events when destroyed:
+**If you are ever destroying a meaningful resource, you should do it with the Burner contract**
+
+This will ensure that any logic that the developer of the resource wants to execute when a resource is destroyed gets executed in the burn callback function, such as emitting events or reducing supply.
+
+Link to Burner docs: https://developers.flow.com/build/cadence/core-contracts/burner
 
 ```cadence
-access(all) resource NFT {
-    access(all) let id: UInt64
+import "Burner"
 
-    init(id: UInt64) {
-        self.id = id
-    }
+let vault <- vaultRef.withdraw(amount: 10.0)
 
-    // Emitted automatically when destroyed
-    destroy() {
-        emit NFTDestroyed(id: self.id)
-    }
-}
-
-access(all) event NFTDestroyed(id: UInt64)
+Burner.burn(<-vault)
 ```
 
 ### Nested Resource Destruction
@@ -252,11 +224,6 @@ access(all) resource Collection {
 
     init() {
         self.nfts <- {}
-    }
-
-    destroy() {
-        // All NFTs in the collection are destroyed automatically
-        destroy self.nfts
     }
 }
 

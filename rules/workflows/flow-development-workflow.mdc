@@ -9,13 +9,18 @@ alwaysApply: false
 **Core Principle**: Always reference official Flow documentation and standard examples when encountering issues or implementing new features.
 
 ### Primary Documentation Sources
-1. [Flow Standard Contracts](https://github.com/onflow/flow-nft) - Reference deployed standard contracts
+1. Flow Standard Contracts - Reference deployed standard contracts:
+    * https://github.com/onflow/flow-nft
+    * https://github.com/onflow/flow-ft
+    * https://github.com/onflow/flow-core-contracts
+    * https://github.com/onflow/flow-evm-bridge
+    * https://github.com/onflow/nft-storefront
 2. [Official Flow Docs](https://developers.flow.com/) - Comprehensive guides
 3. [Cadence Language Reference](https://cadence-lang.org/) - Syntax and type system
 4. [FCL Documentation](https://docs.onflow.org/fcl/) - Frontend integration
 
 ### When to Reference Documentation
-- ⚡ ALWAYS when implementing NFT/FT contracts from scratch
+- ⚡ ALWAYS when implementing any contracts from scratch
 - 🔍 When encountering unfamiliar Cadence errors
 - 🚀 Before deploying to testnet
 - 🔧 When adding new features to existing contracts
