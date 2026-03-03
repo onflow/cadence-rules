@@ -32,18 +32,18 @@ Rules that prevent security vulnerabilities or compilation errors:
 - Default to private access (`access(self)` or `access(contract)`)
 - Use entitlements for privileged operations
 - Resources must be explicitly moved or destroyed
-- Never expose full resource access via public capabilities
+- Never expose entitled resource access via public capabilities
 - Always check capabilities before borrowing
 - String imports for portability
 - Four-phase transaction structure (prepare → pre → execute → post)
 
 ### 🟡 High Priority (SHOULD Follow)
 Rules that ensure code quality and maintainability:
-- Use interface types when publishing capabilities
 - Store capability controllers for revocation
 - Borrow instead of load/save for efficiency
 - Named constants for repeated values
 - Descriptive naming conventions
+- Clear and descriptive error messages
 - Minimal transaction entitlements
 - Contract initializers for setup
 
@@ -51,7 +51,6 @@ Rules that ensure code quality and maintainability:
 Rules that improve developer experience:
 - Add explanatory comments
 - Regular capability audits
-- Comprehensive error messages
 - Post-conditions for transaction verification
 - Report structs for script accessibility
 
@@ -74,7 +73,7 @@ Rules that improve developer experience:
 ### 3. Capability-Based Security
 **Leverage Flow's security model**
 - Issue minimal-privilege capabilities
-- Use interface types to restrict access
+- Use entitlements to restrict capability access
 - Retain controllers for revocation
 - Regular audits and cleanup
 
@@ -125,10 +124,12 @@ access(all) contract MyToken {
 import "NonFungibleToken"
 
 access(all) contract MyNFT {
+    access(all) entitlement Withdraw
+
     // Interface for public access
     access(all) resource interface NFTPublic {
         access(all) let id: UInt64
-        access(all) fun getMetadata(): {String: String}
+        access(all) view fun getMetadata(): {String: String}
     }
 
     // Resource implementing interface
@@ -136,7 +137,7 @@ access(all) contract MyNFT {
         access(all) let id: UInt64
         access(self) let metadata: {String: String}
 
-        access(all) fun getMetadata(): {String: String} {
+        access(all) view fun getMetadata(): {String: String} {
             return self.metadata
         }
 
@@ -156,12 +157,12 @@ access(all) contract MyNFT {
             destroy old
         }
 
-        access(all) fun withdraw(id: UInt64): @NFT {
+        access(Withdraw) fun withdraw(id: UInt64): @NFT {
             return <- self.items.remove(key: id)
-                ?? panic("NFT not found")
+                ?? panic("NFT with ID \(id) not found in collection")
         }
 
-        access(all) fun borrowNFT(id: UInt64): &{NFTPublic}? {
+        access(all) view fun borrowNFT(id: UInt64): &{NFTPublic}? {
             return &self.items[id] as &{NFTPublic}?
         }
 
@@ -189,7 +190,7 @@ transaction(amount: UFix64, recipient: Address) {
     prepare(signer: auth(BorrowValue) &Account) {
         self.senderVault = signer.storage
             .borrow<&{FungibleToken.Provider}>(from: /storage/vault)
-            ?? panic("Vault not found")
+            ?? panic("Could not borrow FungibleToken Provider reference from /storage/vault")
 
         self.recipientVault = getAccount(recipient)
             .capabilities.borrow<&{FungibleToken.Receiver}>(/public/receiver)
@@ -199,8 +200,8 @@ transaction(amount: UFix64, recipient: Address) {
     }
 
     pre {
-        amount > 0.0: "Amount must be positive"
-        self.senderVault.balance >= amount: "Insufficient balance"
+        amount > 0.0: "Amount must be positive: received \(amount)"
+        self.senderVault.balance >= amount: "Insufficient balance: available \(self.senderVault.balance), required \(amount)"
     }
 
     execute {
@@ -210,7 +211,7 @@ transaction(amount: UFix64, recipient: Address) {
 
     post {
         self.senderVault.balance == self.startBalance - amount:
-            "Sender balance incorrect"
+            "Sender balance not decreased by transfer amount \(amount): current balance is \(self.senderVault.balance)"
     }
 }
 ```
@@ -221,7 +222,6 @@ transaction(amount: UFix64, recipient: Address) {
 - Start all fields with `access(self)` or `access(contract)`
 - Use entitlements for privileged functions
 - Include `init()` function
-- Define public interfaces for external access
 - Use named constants for repeated values
 
 ### When Generating Resources
@@ -229,7 +229,7 @@ transaction(amount: UFix64, recipient: Address) {
 - Always use `<-` operator for operations
 - Ensure all code paths handle resources
 - Include `destroy()` for nested resources
-- Use interfaces to separate public and private operations
+- Use entitlements to separate public and private operations
 
 ### When Generating Transactions
 - Use explicit phase structure: `prepare` → `pre` → `execute` → `post`
@@ -239,9 +239,9 @@ transaction(amount: UFix64, recipient: Address) {
 - Verify outcomes in `post`
 
 ### When Generating Capabilities
-- Issue with minimal entitlements
+- Issue with minimal or no entitlements
 - Check for existing capabilities first
-- Use interface types when publishing
+- Use concrete types when publishing
 - Store controllers for revocation
 - Tag with descriptive metadata
 

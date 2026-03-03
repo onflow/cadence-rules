@@ -75,29 +75,6 @@ access(all) resource NFT {
 }
 ```
 
-### Resource with Interfaces
-
-```cadence
-access(all) resource interface NFTPublic {
-    access(all) let id: UInt64
-    access(all) fun getMetadata(): {String: String}
-}
-
-access(all) resource NFT: NFTPublic {
-    access(all) let id: UInt64
-    access(self) var metadata: {String: String}
-
-    access(all) fun getMetadata(): {String: String} {
-        return self.metadata
-    }
-
-    init(id: UInt64, metadata: {String: String}) {
-        self.id = id
-        self.metadata = metadata
-    }
-}
-```
-
 ## Resource Creation
 
 ### Using the `create` Keyword
@@ -221,25 +198,20 @@ if shouldKeep {
 }
 ```
 
-### Destroy Events
+### Burner Contract
 
-Resources can emit events when destroyed:
+**If you are ever destroying a meaningful resource, you should do it with the Burner contract**
+
+This will ensure that any logic that the developer of the resource wants to execute when a resource is destroyed gets executed in the burn callback function, such as emitting events or reducing supply.
+
+Link to Burner docs: https://developers.flow.com/build/cadence/core-contracts/burner
 
 ```cadence
-access(all) resource NFT {
-    access(all) let id: UInt64
+import "Burner"
 
-    init(id: UInt64) {
-        self.id = id
-    }
+let vault <- vaultRef.withdraw(amount: 10.0)
 
-    // Emitted automatically when destroyed
-    destroy() {
-        emit NFTDestroyed(id: self.id)
-    }
-}
-
-access(all) event NFTDestroyed(id: UInt64)
+Burner.burn(<-vault)
 ```
 
 ### Nested Resource Destruction
@@ -252,11 +224,6 @@ access(all) resource Collection {
 
     init() {
         self.nfts <- {}
-    }
-
-    destroy() {
-        // All NFTs in the collection are destroyed automatically
-        destroy self.nfts
     }
 }
 
@@ -331,6 +298,8 @@ access(all) resource VaultCollection {
 ### Working with Resource Dictionaries
 
 ```cadence
+access(all) entitlement Withdraw
+
 access(all) resource NFTCollection {
     access(self) var nfts: @{UInt64: NFT}
 
@@ -346,9 +315,9 @@ access(all) resource NFTCollection {
     }
 
     // Withdraw (remove and return)
-    access(all) fun withdraw(id: UInt64): @NFT {
+    access(Withdraw) fun withdraw(id: UInt64): @NFT {
         let nft <- self.nfts.remove(key: id)
-            ?? panic("NFT not found")
+            ?? panic("NFT with ID \(id) not found in collection")
         return <-nft
     }
 
@@ -357,7 +326,7 @@ access(all) resource NFTCollection {
         let id = nft.id
 
         // Check if already exists
-        assert(self.nfts[id] == nil, message: "NFT already exists")
+        assert(self.nfts[id] == nil, message: "NFT with ID \(id) already exists in collection")
 
         // Insert (use force-insert operator <-!)
         self.nfts[id] <-! nft
@@ -439,7 +408,7 @@ log(nft.uuid)  // Unique across all resources
 
 ```cadence
 access(all) resource Vault {
-    access(all) fun getOwner(): Address? {
+    access(all) view fun getOwner(): Address? {
         return self.owner?.address
     }
 }
@@ -629,7 +598,7 @@ let vaultRef = capability.borrow<&Vault>()
 transaction() {
     prepare(signer: auth(Storage) &Account) {
         let vault <- signer.storage.load<@Vault>(from: /storage/oldVault)
-            ?? panic("Vault not found")
+            ?? panic("Vault not found at /storage/oldVault")
 
         signer.storage.save(<-vault, to: /storage/newVault)
     }

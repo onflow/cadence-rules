@@ -27,16 +27,16 @@ transaction(amount: UFix64, recipient: Address) {
         // Access signer account
         self.senderVault = signer.storage
             .borrow<&{FungibleToken.Provider}>(from: /storage/flowTokenVault)
-            ?? panic("Could not borrow provider reference")
+            ?? panic("Could not borrow FungibleToken Provider reference from /storage/flowTokenVault")
 
         // Access recipient account (public)
         self.recipientReceiver = getAccount(recipient)
             .capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
-            ?? panic("Could not borrow receiver reference")
+            ?? panic("Could not borrow FungibleToken Receiver reference from /public/flowTokenReceiver")
     }
 
     pre {
-        amount > 0.0: "Amount must be positive"
+        amount > 0.0: "Amount must be positive: received \(amount)"
     }
 
     execute {
@@ -45,7 +45,7 @@ transaction(amount: UFix64, recipient: Address) {
     }
 
     post {
-        self.senderVault.balance >= 0.0: "Sender balance cannot be negative"
+        self.senderVault.balance >= 0.0: "Sender balance cannot be negative: current balance is \(self.senderVault.balance)"
     }
 }
 ```
@@ -71,11 +71,11 @@ prepare(signer: auth(BorrowValue, SaveValue, IssueStorageCapabilityController) &
     // ✅ CORRECT: Borrowing from storage
     self.vault = signer.storage
         .borrow<&{FungibleToken.Vault}>(from: /storage/flowTokenVault)
-        ?? panic("Vault not found")
+        ?? panic("Could not borrow FungibleToken Vault reference from /storage/flowTokenVault")
 
     // ✅ CORRECT: Issuing capability
     self.cap = signer.capabilities.storage
-        .issue<&{MyInterface}>(/storage/myResource)
+        .issue<&MyResource>(/storage/myResource)
 
     // ✅ CORRECT: Saving resource
     let resource <- create MyResource()
@@ -99,11 +99,11 @@ prepare(
     // Access both accounts
     self.vault1 = signer1.storage
         .borrow<&{FungibleToken.Vault}>(from: /storage/flowTokenVault)
-        ?? panic("Vault 1 not found")
+        ?? panic("Could not borrow FungibleToken Vault reference from /storage/flowTokenVault for signer1")
 
     self.vault2 = signer2.storage
         .borrow<&{FungibleToken.Vault}>(from: /storage/flowTokenVault)
-        ?? panic("Vault 2 not found")
+        ?? panic("Could not borrow FungibleToken Vault reference from /storage/flowTokenVault for signer2")
 }
 ```
 
@@ -120,8 +120,8 @@ prepare(
 
 ```cadence
 pre {
-    amount > 0.0: "Amount must be positive"
-    amount <= 1000.0: "Amount exceeds maximum"
+    amount > 0.0: "Amount must be positive: received \(amount)"
+    amount <= 1000.0: "Amount exceeds maximum of 1000.0: received \(amount)"
     recipient != signer.address: "Cannot send to yourself"
 }
 ```
@@ -130,9 +130,9 @@ pre {
 
 ```cadence
 pre {
-    amount > 0.0: "Amount must be positive"
-    self.senderVault.balance >= amount: "Insufficient balance"
-    self.recipientReceiver != nil: "Invalid recipient"
+    amount > 0.0: "Amount must be positive: received \(amount)"
+    self.senderVault.balance >= amount: "Insufficient balance: available \(self.senderVault.balance), required \(amount)"
+    self.recipientReceiver != nil: "Recipient does not have a valid receiver capability"
 }
 ```
 
@@ -182,10 +182,10 @@ execute {
 ```cadence
 post {
     self.recipientReceiver.balance > before(self.recipientReceiver.balance):
-        "Recipient balance did not increase"
+        "Recipient balance did not increase: current balance is \(self.recipientReceiver.balance)"
 
     self.senderVault.balance == before(self.senderVault.balance) - amount:
-        "Sender balance incorrect"
+        "Sender balance not decreased by \(amount): current balance is \(self.senderVault.balance)"
 }
 ```
 
@@ -198,7 +198,7 @@ transaction(amount: UFix64) {
     prepare(signer: auth(BorrowValue) &Account) {
         self.vault = signer.storage
             .borrow<&{FungibleToken.Vault}>(from: /storage/flowTokenVault)
-            ?? panic("Vault not found")
+            ?? panic("Could not borrow FungibleToken Vault reference from /storage/flowTokenVault")
     }
 
     execute {
@@ -287,7 +287,7 @@ transaction(amount: UFix64) {
         // Initialize fields
         self.senderVault = signer.storage
             .borrow<&{FungibleToken.Provider}>(from: /storage/flowTokenVault)
-            ?? panic("Vault not found")
+            ?? panic("Could not borrow FungibleToken Provider reference from /storage/flowTokenVault")
 
         self.startBalance = self.senderVault.balance
     }
@@ -301,7 +301,7 @@ transaction(amount: UFix64) {
     post {
         // Reference fields
         self.senderVault.balance == self.startBalance - amount:
-            "Balance mismatch"
+            "Sender balance not decreased by transfer amount \(amount): current balance is \(self.senderVault.balance)"
     }
 }
 ```
@@ -322,7 +322,7 @@ transaction() {
     prepare(signer: auth(BorrowValue) &Account) {
         self.vault = signer.storage
             .borrow<&{FungibleToken.Vault}>(from: /storage/flowTokenVault)
-            ?? panic("Vault not found")
+            ?? panic("Could not borrow FungibleToken Vault reference from /storage/flowTokenVault")
     }
 }
 ```
@@ -338,7 +338,7 @@ transaction() {
 prepare(signer: auth(BorrowValue) &Account) {
     self.vault = signer.storage
         .borrow<&{FungibleToken.Vault}>(from: /storage/flowTokenVault)
-        ?? panic("Vault not found")
+        ?? panic("Could not borrow FungibleToken Vault reference from /storage/flowTokenVault")
 }
 
 execute {
@@ -351,7 +351,7 @@ execute {
 prepare(signer: auth(BorrowValue) &Account) {
     self.vault = signer.storage
         .borrow<&{FungibleToken.Vault}>(from: /storage/flowTokenVault)
-        ?? panic("Vault not found")
+        ?? panic("Could not borrow FungibleToken Vault reference from /storage/flowTokenVault")
 
     // Don't do business logic in prepare
     let withdrawn <- self.vault.withdraw(amount: amount)
@@ -367,21 +367,21 @@ prepare(signer: auth(BorrowValue) &Account) {
 // ✅ CORRECT: Validation in pre
 prepare(signer: auth(BorrowValue) &Account) {
     self.vault = signer.storage.borrow<&{FungibleToken.Vault}>(from: /storage/vault)
-        ?? panic("Vault not found")
+        ?? panic("Could not borrow FungibleToken Vault reference from /storage/vault")
 }
 
 pre {
-    amount > 0.0: "Amount must be positive"
-    amount <= 1000.0: "Amount too large"
+    amount > 0.0: "Amount must be positive: received \(amount)"
+    amount <= 1000.0: "Amount exceeds maximum of 1000.0: received \(amount)"
 }
 
 // ❌ LESS IDEAL: Validation in prepare
 prepare(signer: auth(BorrowValue) &Account) {
-    assert(amount > 0.0, message: "Amount must be positive")
-    assert(amount <= 1000.0, message: "Amount too large")
+    assert(amount > 0.0, message: "Amount must be positive: received \(amount)")
+    assert(amount <= 1000.0, message: "Amount exceeds maximum of 1000.0: received \(amount)")
 
     self.vault = signer.storage.borrow<&{FungibleToken.Vault}>(from: /storage/vault)
-        ?? panic("Vault not found")
+        ?? panic("Could not borrow FungibleToken Vault reference from /storage/vault")
 }
 ```
 
@@ -392,7 +392,7 @@ prepare(signer: auth(BorrowValue) &Account) {
 ```cadence
 post {
     self.vault.balance == before(self.vault.balance) - amount:
-        "Balance change incorrect"
+        "Balance not decreased by \(amount): current balance is \(self.vault.balance)"
 
     result != nil: "Operation must return a result"
 }
@@ -409,11 +409,11 @@ transaction(amount: UFix64) {
 
     prepare(signer: auth(BorrowValue) &Account) {
         self.vault = signer.storage.borrow<&{FungibleToken.Vault}>(from: /storage/vault)
-            ?? panic("Vault not found")
+            ?? panic("Could not borrow FungibleToken Vault reference from /storage/vault")
     }
 
     pre {
-        amount > 0.0: "Amount must be positive"
+        amount > 0.0: "Amount must be positive: received \(amount)"
     }
 
     execute {
@@ -422,7 +422,7 @@ transaction(amount: UFix64) {
     }
 
     post {
-        self.vault.balance >= 0.0: "Balance cannot be negative"
+        self.vault.balance >= 0.0: "Balance cannot be negative: current balance is \(self.vault.balance)"
     }
 }
 
@@ -430,14 +430,14 @@ transaction(amount: UFix64) {
 transaction(amount: UFix64) {
     prepare(signer: auth(BorrowValue) &Account) {
         let vault = signer.storage.borrow<&{FungibleToken.Vault}>(from: /storage/vault)
-            ?? panic("Vault not found")
+            ?? panic("Could not borrow FungibleToken Vault reference from /storage/vault")
 
-        assert(amount > 0.0, message: "Amount must be positive")
+        assert(amount > 0.0, message: "Amount must be positive: received \(amount)")
 
         let withdrawn <- vault.withdraw(amount: amount)
         destroy withdrawn
 
-        assert(vault.balance >= 0.0, message: "Balance cannot be negative")
+        assert(vault.balance >= 0.0, message: "Balance cannot be negative: current balance is \(vault.balance)")
     }
 }
 ```
@@ -462,7 +462,7 @@ prepare(signer: auth(BorrowValue, SaveValue) &Account) {
 prepare(signer: auth(BorrowValue, IssueStorageCapabilityController) &Account) {
     // Needs BorrowValue and capability issuance
     let cap = signer.capabilities.storage
-        .issue<&{MyInterface}>(/storage/myResource)
+        .issue<&MyResource>(/storage/myResource)
 }
 
 // ❌ WRONG: Over-privileged
@@ -504,14 +504,14 @@ auth(BorrowValue, Keys) &Account
 // ✅ CORRECT: Minimal entitlements
 prepare(signer: auth(BorrowValue) &Account) {
     self.vault = signer.storage.borrow<&{FungibleToken.Vault}>(from: /storage/vault)
-        ?? panic("Vault not found")
+        ?? panic("Could not borrow FungibleToken Vault reference from /storage/vault")
 }
 
 // ❌ AVOID: Unnecessary entitlements
 prepare(signer: auth(Storage, Contracts, Keys) &Account) {
     // Only uses BorrowValue
     self.vault = signer.storage.borrow<&{FungibleToken.Vault}>(from: /storage/vault)
-        ?? panic("Vault not found")
+        ?? panic("Could not borrow FungibleToken Vault reference from /storage/vault")
 }
 ```
 
@@ -527,7 +527,7 @@ prepare(signer: auth(BorrowValue) &Account) {
 
     // Verify capability exists
     if self.recipientCap == nil {
-        panic("Recipient does not have receiver capability")
+        panic("Could not borrow FungibleToken Receiver reference from /public/receiver for account \(recipient)")
     }
 }
 
@@ -586,11 +586,11 @@ transaction(amount: UFix64) {
 
     prepare(signer: auth(BorrowValue) &Account) {
         self.vault = signer.storage.borrow<&{FungibleToken.Vault}>(from: /storage/vault)
-            ?? panic("Vault not found")
+            ?? panic("Could not borrow FungibleToken Vault reference from /storage/vault")
     }
 
     pre {
-        amount > 0.0: "Amount must be positive"
+        amount > 0.0: "Amount must be positive: received \(amount)"
     }
 
     execute {
@@ -599,7 +599,7 @@ transaction(amount: UFix64) {
     }
 
     post {
-        self.vault.balance >= 0.0: "Balance non-negative"
+        self.vault.balance >= 0.0: "Balance cannot be negative: current balance is \(self.vault.balance)"
     }
 }
 ```
@@ -626,7 +626,7 @@ prepare(signer: auth(BorrowValue, SaveValue) &Account) {
 
 ```cadence
 pre {
-    amount > 0.0: "Amount must be positive"
+    amount > 0.0: "Amount must be positive: received \(amount)"
     recipient != signer.address: "Cannot send to yourself"
 }
 ```
@@ -638,7 +638,7 @@ pre {
 ```cadence
 post {
     result != nil: "Transaction must produce result"
-    self.balance >= 0.0: "Balance cannot be negative"
+    self.balance >= 0.0: "Balance cannot be negative: current balance is \(self.balance)"
 }
 ```
 
@@ -684,7 +684,7 @@ transaction(amount: UFix64, to: Address) {
     prepare(signer: auth(BorrowValue) &Account) {
         let vaultRef = signer.storage
             .borrow<auth(FungibleToken.Withdraw) &{FungibleToken.Vault}>(from: /storage/vault)
-            ?? panic("Could not borrow vault")
+            ?? panic("Could not borrow FungibleToken Vault reference from /storage/vault")
 
         self.sentVault <- vaultRef.withdraw(amount: amount)
     }
@@ -692,7 +692,7 @@ transaction(amount: UFix64, to: Address) {
     execute {
         let recipient = getAccount(to)
             .capabilities.borrow<&{FungibleToken.Receiver}>(/public/receiver)
-            ?? panic("Could not borrow receiver")
+            ?? panic("Could not borrow FungibleToken Receiver reference from /public/receiver")
 
         recipient.deposit(from: <-self.sentVault)
     }
@@ -714,7 +714,7 @@ transaction() {
 
         // Create and publish capability
         let cap = signer.capabilities.storage
-            .issue<&{MyContract.ResourcePublic}>(/storage/myResource)
+            .issue<&MyContract.Resource>(/storage/myResource)
         signer.capabilities.publish(cap, at: /public/myResource)
     }
 }

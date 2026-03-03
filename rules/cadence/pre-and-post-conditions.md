@@ -23,8 +23,8 @@ Pre-conditions validate that:
 ```cadence
 access(all) fun myFunction(amount: UFix64) {
     pre {
-        amount > 0.0: "Amount must be positive"
-        amount <= 1000.0: "Amount exceeds maximum"
+        amount > 0.0: "Amount must be positive: received \(amount)"
+        amount <= 1000.0: "Amount exceeds maximum of 1000.0: received \(amount)"
     }
 
     // Function body
@@ -38,8 +38,8 @@ Each condition is a boolean expression with an optional error message:
 ```cadence
 access(all) fun transfer(amount: UFix64, to: Address) {
     pre {
-        amount > 0.0: "Amount must be positive"
-        amount <= self.balance: "Insufficient balance"
+        amount > 0.0: "Amount must be positive: received \(amount)"
+        amount <= self.balance: "Insufficient balance: available \(self.balance), required \(amount)"
         to != self.owner?.address: "Cannot transfer to self"
     }
 
@@ -66,10 +66,10 @@ Post-conditions validate that:
 ### Syntax
 
 ```cadence
-access(all) fun withdraw(amount: UFix64): @Vault {
+access(Withdraw) fun withdraw(amount: UFix64): @Vault {
     post {
-        result.balance == amount: "Withdrawn amount incorrect"
-        self.balance == before(self.balance) - amount: "Balance not updated"
+        result.balance == amount: "Withdrawn amount incorrect: expected \(amount), got \(result.balance)"
+        self.balance == before(self.balance) - amount: "Balance not decreased by withdrawal amount \(amount): current balance is \(self.balance)"
     }
 
     // Function body
@@ -83,10 +83,10 @@ access(all) fun withdraw(amount: UFix64): @Vault {
 In post-conditions, `result` refers to the function's return value:
 
 ```cadence
-access(all) fun calculateTotal(values: [UFix64]): UFix64 {
+access(all) view fun calculateTotal(values: [UFix64]): UFix64 {
     post {
-        result >= 0.0: "Total cannot be negative"
-        result <= UFix64.max: "Total overflow"
+        result >= 0.0: "Total cannot be negative: got \(result)"
+        result <= UFix64.max: "Total overflows UFix64 maximum: got \(result)"
     }
 
     var total: UFix64 = 0.0
@@ -105,7 +105,7 @@ access(all) fun calculateTotal(values: [UFix64]): UFix64 {
 access(all) fun increment() {
     post {
         self.counter == before(self.counter) + 1:
-            "Counter not incremented correctly"
+            "Counter not incremented correctly: current value is \(self.counter)"
     }
 
     self.counter = self.counter + 1
@@ -118,7 +118,7 @@ access(all) fun deposit(from: @Vault) {
 
     post {
         self.balance == before(self.balance) + amountDeposited:
-            "Balance not updated correctly"
+            "Deposit of \(amountDeposited) not reflected in balance: current balance is \(self.balance)"
     }
 
     self.balance = self.balance + from.balance
@@ -131,18 +131,20 @@ access(all) fun deposit(from: @Vault) {
 ### Basic Function Conditions
 
 ```cadence
+access(all) entitlement Withdraw
+
 access(all) resource Vault {
     access(self) var balance: UFix64
 
-    access(all) fun withdraw(amount: UFix64): @Vault {
+    access(Withdraw) fun withdraw(amount: UFix64): @Vault {
         pre {
-            amount > 0.0: "Amount must be positive"
-            amount <= self.balance: "Insufficient balance"
+            amount > 0.0: "Amount must be positive: received \(amount)"
+            amount <= self.balance: "Insufficient balance: available \(self.balance), required \(amount)"
         }
 
         post {
-            result.balance == amount: "Incorrect withdrawal amount"
-            self.balance == before(self.balance) - amount: "Balance not updated"
+            result.balance == amount: "Incorrect withdrawal amount: expected \(amount), got \(result.balance)"
+            self.balance == before(self.balance) - amount: "Balance not decreased by withdrawal amount \(amount): current balance is \(self.balance)"
         }
 
         self.balance = self.balance - amount
@@ -164,16 +166,16 @@ access(all) fun processTransaction(
     amount: UFix64
 ) {
     pre {
-        amount > 0.0: "Amount must be positive"
-        from.balance >= amount: "Sender has insufficient balance"
+        amount > 0.0: "Amount must be positive: received \(amount)"
+        from.balance >= amount: "Sender has insufficient balance: available \(from.balance), required \(amount)"
         to.canReceive(): "Receiver cannot accept funds"
     }
 
     post {
         from.balance == before(from.balance) - amount:
-            "Sender balance incorrect"
+            "Sender balance not decreased by \(amount): current balance is \(from.balance)"
         to.balance == before(to.balance) + amount:
-            "Receiver balance incorrect"
+            "Receiver balance not increased by \(amount): current balance is \(to.balance)"
     }
 
     let withdrawn <- from.withdraw(amount: amount)
@@ -193,12 +195,12 @@ transaction(amount: UFix64, recipient: Address) {
 
     prepare(signer: auth(BorrowValue) &Account) {
         self.vault = signer.storage.borrow<&Vault>(from: /storage/vault)
-            ?? panic("Vault not found")
+            ?? panic("Could not borrow Vault reference from /storage/vault")
     }
 
     pre {
-        amount > 0.0: "Amount must be positive"
-        amount <= self.vault.balance: "Insufficient balance"
+        amount > 0.0: "Amount must be positive: received \(amount)"
+        amount <= self.vault.balance: "Insufficient balance: available \(self.vault.balance), required \(amount)"
         recipient != signer.address: "Cannot send to yourself"
     }
 
@@ -219,7 +221,7 @@ transaction(amount: UFix64) {
 
     prepare(signer: auth(BorrowValue) &Account) {
         self.vault = signer.storage.borrow<&Vault>(from: /storage/vault)
-            ?? panic("Vault not found")
+            ?? panic("Could not borrow Vault reference from /storage/vault")
         self.startBalance = self.vault.balance
     }
 
@@ -231,9 +233,9 @@ transaction(amount: UFix64) {
 
     post {
         self.vault.balance == self.startBalance - amount:
-            "Balance not updated correctly"
+            "Balance not decreased by withdrawal amount \(amount): current balance is \(self.vault.balance)"
         self.vault.balance >= 0.0:
-            "Balance cannot be negative"
+            "Balance cannot be negative: current balance is \(self.vault.balance)"
     }
 }
 ```
@@ -249,19 +251,19 @@ transaction(amount: UFix64, recipient: Address) {
 
     prepare(signer: auth(BorrowValue) &Account) {
         self.senderVault = signer.storage.borrow<&Vault>(from: /storage/vault)
-            ?? panic("Sender vault not found")
+            ?? panic("Could not borrow Vault reference from /storage/vault")
 
         self.recipientVault = getAccount(recipient)
             .capabilities.borrow<&{VaultPublic}>(/public/vault)
-            ?? panic("Recipient vault not found")
+            ?? panic("Could not borrow VaultPublic reference from /public/vault")
 
         self.startSenderBalance = self.senderVault.balance
         self.startRecipientBalance = self.recipientVault.balance
     }
 
     pre {
-        amount > 0.0: "Amount must be positive"
-        amount <= self.senderVault.balance: "Insufficient balance"
+        amount > 0.0: "Amount must be positive: received \(amount)"
+        amount <= self.senderVault.balance: "Insufficient balance: available \(self.senderVault.balance), required \(amount)"
         recipient != signer.address: "Cannot send to yourself"
     }
 
@@ -272,9 +274,9 @@ transaction(amount: UFix64, recipient: Address) {
 
     post {
         self.senderVault.balance == self.startSenderBalance - amount:
-            "Sender balance incorrect"
+            "Sender balance not decreased by \(amount): current balance is \(self.senderVault.balance)"
         self.recipientVault.balance == self.startRecipientBalance + amount:
-            "Recipient balance incorrect"
+            "Recipient balance not increased by \(amount): current balance is \(self.recipientVault.balance)"
     }
 }
 ```
@@ -329,17 +331,19 @@ access(all) fun myFunction() {
 Interfaces can define conditions that implementations inherit:
 
 ```cadence
+access(all) entitlement Withdraw
+
 access(all) resource interface Vault {
     access(all) var balance: UFix64
 
-    access(all) fun withdraw(amount: UFix64): @Vault {
+    access(Withdraw) fun withdraw(amount: UFix64): @Vault {
         pre {
-            amount > 0.0: "Amount must be positive"
-            amount <= self.balance: "Insufficient balance"
+            amount > 0.0: "Amount must be positive: received \(amount)"
+            amount <= self.balance: "Insufficient balance: available \(self.balance), required \(amount)"
         }
         post {
-            result.balance == amount: "Incorrect amount"
-            self.balance == before(self.balance) - amount: "Balance mismatch"
+            result.balance == amount: "Incorrect withdrawal amount: expected \(amount), got \(result.balance)"
+            self.balance == before(self.balance) - amount: "Balance not decreased by withdrawal amount \(amount): current balance is \(self.balance)"
         }
     }
 }
@@ -349,7 +353,7 @@ access(all) resource MyVault: Vault {
     access(all) var balance: UFix64
 
     // Must satisfy interface conditions
-    access(all) fun withdraw(amount: UFix64): @Vault {
+    access(Withdraw) fun withdraw(amount: UFix64): @Vault {
         // Interface pre-condition checked automatically
         self.balance = self.balance - amount
         return <- create MyVault(balance: amount)
@@ -387,7 +391,7 @@ access(all) resource MyVault: Vault {
     access(all) var balance: UFix64
     access(all) var locked: Bool
 
-    access(all) fun withdraw(amount: UFix64): @Vault {
+    access(Withdraw) fun withdraw(amount: UFix64): @Vault {
         // Interface conditions checked
         pre {
             // Additional implementation condition
@@ -483,8 +487,8 @@ access(all) fun increment(by: UInt64) {
 ```cadence
 // ✅ GOOD: Separate conditions
 pre {
-    amount > 0.0: "Amount must be positive"
-    amount <= maxAmount: "Amount exceeds maximum"
+    amount > 0.0: "Amount must be positive: received \(amount)"
+    amount <= maxAmount: "Amount exceeds maximum of \(maxAmount): received \(amount)"
     recipient != sender: "Cannot transfer to self"
 }
 
@@ -500,15 +504,15 @@ pre {
 ### Pattern 1: Balance Validation
 
 ```cadence
-access(all) fun withdraw(amount: UFix64): @Vault {
+access(Withdraw) fun withdraw(amount: UFix64): @Vault {
     pre {
-        amount > 0.0: "Amount must be positive"
-        self.balance >= amount: "Insufficient balance"
+        amount > 0.0: "Amount must be positive: received \(amount)"
+        self.balance >= amount: "Insufficient balance: available \(self.balance), required \(amount)"
     }
 
     post {
-        result.balance == amount: "Withdrawn amount incorrect"
-        self.balance == before(self.balance) - amount: "Balance not updated"
+        result.balance == amount: "Withdrawn amount incorrect: expected \(amount), got \(result.balance)"
+        self.balance == before(self.balance) - amount: "Balance not decreased by withdrawal amount \(amount): current balance is \(self.balance)"
     }
 
     self.balance = self.balance - amount
@@ -527,12 +531,12 @@ access(all) enum Status: UInt8 {
 
 access(all) fun complete() {
     pre {
-        self.status == Status.active: "Can only complete active items"
+        self.status == Status.active: "Can only complete active items: current status is \(self.status.rawValue)"
     }
 
     post {
-        self.status == Status.completed: "Status not updated to completed"
-        before(self.status) == Status.active: "Invalid state transition"
+        self.status == Status.completed: "Status not updated to completed: current status is \(self.status.rawValue)"
+        before(self.status) == Status.active: "Invalid state transition: item was not active before completion"
     }
 
     self.status = Status.completed
@@ -546,12 +550,12 @@ access(all) fun mergeVaults(other: @Vault): @Vault {
     let otherBalance = other.balance
 
     pre {
-        other.balance > 0.0: "Cannot merge empty vault"
+        other.balance > 0.0: "Cannot merge empty vault: other vault has balance \(other.balance)"
     }
 
     post {
         result.balance == before(self.balance) + otherBalance:
-            "Merged balance incorrect"
+            "Merged balance incorrect: expected \(otherBalance) from merged vault to be included, got \(result.balance)"
     }
 
     let totalBalance = self.balance + other.balance
@@ -566,14 +570,14 @@ access(all) fun mergeVaults(other: @Vault): @Vault {
 ```cadence
 access(all) fun addItem(item: Item) {
     pre {
-        !self.items.contains(item.id): "Item already exists"
-        self.items.length < self.maxItems: "Collection full"
+        !self.items.contains(item.id): "Item already exists: item with ID \(item.id) is already in collection"
+        self.items.length < self.maxItems: "Collection is full: maximum capacity is \(self.maxItems), current size is \(self.items.length)"
     }
 
     post {
-        self.items.contains(item.id): "Item not added"
+        self.items.contains(item.id): "Item not added: item with ID \(item.id) not found in collection after add"
         self.items.length == before(self.items.length) + 1:
-            "Collection size not updated"
+            "Collection size not updated after adding item with ID \(item.id): current size is \(self.items.length)"
     }
 
     self.items.append(item)
@@ -589,7 +593,7 @@ access(all) fun addItem(item: Item) {
 ```cadence
 access(all) fun transfer(amount: UFix64, to: Address) {
     pre {
-        amount > 0.0: "Amount must be positive"
+        amount > 0.0: "Amount must be positive: received \(amount)"
         to != self.owner?.address: "Cannot transfer to self"
     }
 
@@ -602,10 +606,10 @@ access(all) fun transfer(amount: UFix64, to: Address) {
 **Verify important state changes.**
 
 ```cadence
-access(all) fun withdraw(amount: UFix64): @Vault {
+access(Withdraw) fun withdraw(amount: UFix64): @Vault {
     post {
-        result.balance == amount: "Incorrect withdrawal"
-        self.balance == before(self.balance) - amount: "Balance mismatch"
+        result.balance == amount: "Incorrect withdrawal: expected \(amount), got \(result.balance)"
+        self.balance == before(self.balance) - amount: "Balance not decreased by withdrawal amount \(amount): current balance is \(self.balance)"
     }
 
     // Function body
@@ -629,8 +633,8 @@ pre {
 
 ```cadence
 post {
-    self.counter == before(self.counter) + 1: "Counter not incremented"
-    self.balance >= before(self.balance): "Balance decreased unexpectedly"
+    self.counter == before(self.counter) + 1: "Counter not incremented: current value is \(self.counter)"
+    self.balance >= before(self.balance): "Balance decreased unexpectedly: current balance is \(self.balance)"
 }
 ```
 

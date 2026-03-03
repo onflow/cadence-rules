@@ -312,34 +312,6 @@ import "NonFungibleToken"
 // FCL automatically resolves to correct addresses
 ```
 
-### Dynamic Import Replacement
-
-```typescript
-// When sending transactions
-import * as fcl from '@onflow/fcl';
-import { contractAddresses } from './config/contracts';
-
-const transactionCode = `
-  import MyContract from 0xMYCONTRACT
-
-  transaction {
-    execute {
-      MyContract.doSomething()
-    }
-  }
-`;
-
-const txId = await fcl.mutate({
-  cadence: transactionCode,
-  args: (arg, t) => [],
-  limit: 9999,
-  // Replace import addresses
-  replace: {
-    '0xMYCONTRACT': contractAddresses.MyContract
-  }
-});
-```
-
 ## CLI Workflow
 
 ### Configuration Management
@@ -506,7 +478,7 @@ config({
 
 #### Issue: "Cannot update contract"
 - Changes to `init()` or resource/struct fields require new contract version
-- Deploy as `MyContractV2.cdc` instead of using `--update`
+- Need to find another way to do the upgrade without adding new fields.
 
 ### FCL Frontend Issues
 

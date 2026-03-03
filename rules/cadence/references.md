@@ -120,7 +120,7 @@ transaction() {
         // Borrow reference from storage
         let vaultRef = signer.storage
             .borrow<&Vault>(from: /storage/vault)
-            ?? panic("Vault not found")
+            ?? panic("Could not borrow Vault reference from /storage/vault")
 
         // Use reference
         log(vaultRef.balance)
@@ -138,7 +138,7 @@ transaction() {
         // Borrow with entitlements
         let vaultRef = signer.storage
             .borrow<auth(FungibleToken.Withdraw) &Vault>(from: /storage/vault)
-            ?? panic("Vault not found")
+            ?? panic("Could not borrow Vault reference from /storage/vault")
 
         // Can call entitled functions
         let withdrawn <- vaultRef.withdraw(amount: 10.0)
@@ -251,11 +251,11 @@ References are covariant - `&T` is a subtype of `&U` when `T` is a subtype of `U
 
 ```cadence
 access(all) resource interface Animal {
-    access(all) fun makeSound(): String
+    access(all) view fun makeSound(): String
 }
 
 access(all) resource Dog: Animal {
-    access(all) fun makeSound(): String {
+    access(all) view fun makeSound(): String {
         return "Woof"
     }
 
@@ -365,54 +365,12 @@ transaction() {
 }
 ```
 
-### Pattern 3: Interface References
-
-```cadence
-access(all) resource interface VaultPublic {
-    access(all) fun getBalance(): UFix64
-    access(all) fun deposit(from: @{FungibleToken.Vault})
-}
-
-access(all) resource Vault: VaultPublic {
-    access(self) var balance: UFix64
-
-    access(all) fun getBalance(): UFix64 {
-        return self.balance
-    }
-
-    access(all) fun deposit(from: @{FungibleToken.Vault}) {
-        // Implementation
-    }
-
-    access(Withdraw) fun withdraw(amount: UFix64): @Vault {
-        // Privileged operation
-    }
-
-    init(balance: UFix64) {
-        self.balance = balance
-    }
-}
-
-// Reference to interface hides privileged operations
-transaction() {
-    execute {
-        let vaultRef = getAccount(address)
-            .capabilities.borrow<&{VaultPublic}>(/public/vault)
-            ?? panic("Vault not found")
-
-        vaultRef.getBalance()  // OK
-        vaultRef.deposit(from: <-vault)  // OK
-        // vaultRef.withdraw(amount: 10.0)  // COMPILE ERROR: not in interface
-    }
-}
-```
-
 ### Pattern 4: Capability Borrowing
 
 ```cadence
 // Most common pattern - borrow from capability
 let cap = getAccount(address)
-    .capabilities.get<&{VaultPublic}>(/public/vault)
+    .capabilities.get<&Vault>(/public/vault)
 
 if let vaultRef = cap.borrow() {
     // Use reference within scope
@@ -490,7 +448,7 @@ transaction() {
     prepare(signer: auth(BorrowValue) &Account) {
         let vaultRef = signer.storage
             .borrow<&Vault>(from: /storage/vault)
-            ?? panic("Vault not found")
+            ?? panic("Could not borrow Vault reference from /storage/vault")
 
         // Use reference
         log(vaultRef.balance)
@@ -619,7 +577,7 @@ transaction() {
     prepare(signer: auth(BorrowValue) &Account) {
         // Most common pattern
         let ref = signer.storage.borrow<&Vault>(from: /storage/vault)
-            ?? panic("Not found")
+            ?? panic("Could not borrow Vault reference from /storage/vault")
 
         log(ref.balance)
     }

@@ -13,11 +13,11 @@
 ```cadence
 // ❌ ANTI-PATTERN: Magic numbers
 access(all) contract BadContract {
-    access(all) fun calculateFee(amount: UFix64): UFix64 {
+    access(all) view fun calculateFee(amount: UFix64): UFix64 {
         return amount * 0.05  // What is 0.05?
     }
 
-    access(all) fun isValidAmount(amount: UFix64): Bool {
+    access(all) view fun isValidAmount(amount: UFix64): Bool {
         return amount >= 10.0 && amount <= 1000.0  // Magic numbers
     }
 }
@@ -29,11 +29,11 @@ access(all) contract GoodContract {
     access(all) let MINIMUM_AMOUNT: UFix64
     access(all) let MAXIMUM_AMOUNT: UFix64
 
-    access(all) fun calculateFee(amount: UFix64): UFix64 {
+    access(all) view fun calculateFee(amount: UFix64): UFix64 {
         return amount * self.FEE_PERCENTAGE
     }
 
-    access(all) fun isValidAmount(amount: UFix64): Bool {
+    access(all) view fun isValidAmount(amount: UFix64): Bool {
         return amount >= self.MINIMUM_AMOUNT && amount <= self.MAXIMUM_AMOUNT
     }
 
@@ -122,7 +122,7 @@ access(all) contract NFTContract {
         access(self) let metadata: {String: String}
 
         // Generate report from resource
-        access(all) fun generateReport(): NFTReport {
+        access(all) view fun generateReport(): NFTReport {
             return NFTReport(
                 id: self.id,
                 owner: self.owner?.address ?? panic("No owner"),
@@ -145,10 +145,10 @@ import "NFTContract"
 access(all) fun main(owner: Address, nftID: UInt64): NFTContract.NFTReport {
     let collection = getAccount(owner)
         .capabilities.borrow<&Collection>(/public/collection)
-        ?? panic("Collection not found")
+        ?? panic("Could not borrow Collection reference from /public/collection")
 
     let nft = collection.borrowNFT(id: nftID)
-        ?? panic("NFT not found")
+        ?? panic("NFT with ID \(nftID) not found in collection")
 
     return nft.generateReport()  // Returns struct, not resource
 }
@@ -286,19 +286,19 @@ transaction(nftID: UInt64, price: UFix64) {
     prepare(buyer: auth(BorrowValue, SaveValue) &Account) {
         self.buyerCollection = buyer.storage
             .borrow<&NFTCollection>(from: /storage/collection)
-            ?? panic("Buyer collection not found")
+            ?? panic("Could not borrow NFTCollection reference from /storage/collection")
 
         // Create payment
         let vault = buyer.storage
             .borrow<auth(FungibleToken.Withdraw) &Vault>(from: /storage/vault)
-            ?? panic("Vault not found")
+            ?? panic("Could not borrow Vault reference from /storage/vault")
 
         self.payment <- vault.withdraw(amount: price)
 
         // Borrow seller collection
         self.sellerCollection = getAccount(sellerAddress)
             .capabilities.borrow<&NFTCollection>(/public/collection)
-            ?? panic("Seller collection not found")
+            ?? panic("Could not borrow NFTCollection reference from /public/collection")
     }
 
     execute {
@@ -334,7 +334,7 @@ transaction() {
     prepare(signer: auth(LoadValue, SaveValue) &Account) {
         // Load resource (expensive)
         let vault <- signer.storage.load<@Vault>(from: /storage/vault)
-            ?? panic("Vault not found")
+            ?? panic("Vault not found at /storage/vault")
 
         // Modify
         vault.someFunction()
@@ -350,7 +350,7 @@ transaction() {
         // Borrow reference (cheap)
         let vaultRef = signer.storage
             .borrow<&Vault>(from: /storage/vault)
-            ?? panic("Vault not found")
+            ?? panic("Could not borrow Vault reference from /storage/vault")
 
         // Modify in place
         vaultRef.someFunction()
@@ -400,7 +400,7 @@ transaction(providerAddress: Address) {
         let cap = recipient.inbox.claim<&MyResource>(
             name: "myResourceAccess",
             provider: providerAddress
-        ) ?? panic("Capability not found in inbox")
+        ) ?? panic("Capability named \"myResourceAccess\" not found in inbox from provider \(providerAddress)")
 
         // Save or use capability
         recipient.storage.save(cap, to: /storage/receivedCapability)
@@ -434,11 +434,11 @@ transaction() {
 
         // Issue new capability
         let controller = signer.capabilities.storage
-            .issue<&{VaultPublic}>(/storage/vault)
+            .issue<&Vault>(/storage/vault)
 
         // Check if already published
         let existingCap = signer.capabilities
-            .borrow<&{VaultPublic}>(/public/vault)
+            .borrow<&{FungibleToken.Receiver}>(/public/vault)
 
         if existingCap == nil {
             // Publish capability
@@ -471,7 +471,7 @@ transaction() {
         // Store controller for later revocation
         let controllers = signer.storage
             .borrow<&[StorageCapabilityController]>(from: /storage/controllers)
-            ?? panic("Controllers not found")
+            ?? panic("Could not borrow StorageCapabilityController reference from /storage/controllers")
 
         controllers.append(controller)
     }
@@ -558,6 +558,8 @@ access(all) resource EnhancedToken {
 **Solution**: Create collection resource with dictionary storage.
 
 ```cadence
+access(all) entitlement Withdraw
+
 access(all) resource Collection {
     access(self) var items: @{UInt64: Item}
 
@@ -569,19 +571,19 @@ access(all) resource Collection {
     }
 
     // Withdraw item
-    access(all) fun withdraw(id: UInt64): @Item {
+    access(Withdraw) fun withdraw(id: UInt64): @Item {
         let item <- self.items.remove(key: id)
-            ?? panic("Item not found")
+            ?? panic("Item with ID \(id) not found in collection")
         return <-item
     }
 
     // Borrow reference
-    access(all) fun borrowItem(id: UInt64): &Item? {
+    access(all) view fun borrowItem(id: UInt64): &Item? {
         return &self.items[id] as &Item?
     }
 
     // Get IDs
-    access(all) fun getIDs(): [UInt64] {
+    access(all) view fun getIDs(): [UInt64] {
         return self.items.keys
     }
 
@@ -647,7 +649,7 @@ transaction() {
             .borrow<&AnyResource>(from: /storage/myResource)
 
         if existing != nil {
-            panic("Path already contains a resource")
+            panic("Path /storage/myResource is already in use")
         }
 
         // Safe to save
@@ -661,6 +663,109 @@ transaction() {
 - Prevents accidental overwrites
 - Explicit error handling
 - Data safety
+
+## Error Message Patterns
+
+### Pattern 16: Descriptive Panic Messages
+
+**Problem**: Generic error messages make debugging difficult and give users no guidance on how to fix the issue.
+
+**Solution**: Include location context, what failed, why it failed, and how to fix it.
+
+```cadence
+// ❌ VAGUE: No context, no guidance
+panic("Not found")
+panic("Insufficient balance")
+panic("Invalid")
+panic("Error")
+
+// ✅ DESCRIPTIVE: Context, cause, and actionable information
+panic("NFT with ID \(id) not found in collection")
+panic("Insufficient balance: available \(self.balance), required \(amount)")
+panic("Could not borrow FungibleToken Vault reference from /storage/flowTokenVault")
+panic("Could not borrow FungibleToken Receiver reference from /public/flowTokenReceiver")
+```
+
+**Format by operation type**:
+
+| Operation | Format |
+|-----------|--------|
+| Storage borrow | `"Could not borrow <TypeName> reference from /storage/path"` |
+| Capability borrow | `"Could not borrow <TypeName> reference from /public/path"` |
+| Storage load | `"<TypeName> not found at /storage/path"` |
+| Collection lookup | `"<TypeName> with ID \(id) not found in collection"` |
+| Balance check | `"Insufficient balance: available \(self.balance), required \(amount)"` |
+| Inbox claim | `"Capability named \"name\" not found in inbox from provider \(provider)"` |
+
+**Type naming**: Use human-readable names like "FungibleToken Vault" or "TopShot Collection" rather than dot notation like "FungibleToken.Vault". This helps non-technical users understand errors.
+
+**Values in messages**: Use string interpolation (`\(value)`) to include actual values. This makes it far easier to diagnose failures without needing additional logging.
+
+```cadence
+// ❌ Static message - doesn't tell you what ID was missing
+?? panic("NFT not found")
+
+// ✅ Dynamic message - tells you exactly what failed
+?? panic("NFT with ID \(id) not found in collection")
+
+// ❌ Doesn't tell you the amounts involved
+pre { self.balance >= amount: "Insufficient balance" }
+
+// ✅ Shows both the available and required amounts
+pre { self.balance >= amount: "Insufficient balance: available \(self.balance), required \(amount)" }
+```
+
+### Pattern 17: Contract Error Message Helpers
+
+**Problem**: Duplicating error message strings across multiple transactions creates inconsistency and typos.
+
+**Solution**: Define reusable error message functions in contracts so all callers share the same wording.
+
+```cadence
+access(all) contract MyToken {
+    access(all) let vaultStoragePath: StoragePath
+    access(all) let receiverPublicPath: PublicPath
+
+    // Error message helpers - callable from transactions and scripts
+    access(all) view fun vaultNotFoundError(): String {
+        return "Could not borrow MyToken Vault reference from \(self.vaultStoragePath)"
+    }
+
+    access(all) view fun receiverNotFoundError(address: Address): String {
+        return "Could not borrow MyToken Receiver reference from \(self.receiverPublicPath) for account \(address)"
+    }
+
+    access(all) view fun nftNotFoundError(id: UInt64): String {
+        return "NFT with ID \(id) not found in collection"
+    }
+
+    init() {
+        self.vaultStoragePath = /storage/myTokenVault
+        self.receiverPublicPath = /public/myTokenReceiver
+    }
+}
+
+// Usage in transactions - consistent error message, no duplication
+transaction(amount: UFix64, recipient: Address) {
+    prepare(signer: auth(BorrowValue) &Account) {
+        let vault = signer.storage
+            .borrow<auth(FungibleToken.Withdraw) &MyToken.Vault>(from: MyToken.vaultStoragePath)
+            ?? panic(MyToken.vaultNotFoundError())
+
+        let receiver = getAccount(recipient)
+            .capabilities.borrow<&{FungibleToken.Receiver}>(MyToken.receiverPublicPath)
+            ?? panic(MyToken.receiverNotFoundError(address: recipient))
+
+        receiver.deposit(from: <-vault.withdraw(amount: amount))
+    }
+}
+```
+
+**Benefits**:
+- Single source of truth for error wording
+- Consistent messages across all transactions
+- Easy to update messaging without touching every transaction
+- Error messages are testable
 
 ## AI Agent Generation Guidelines
 
@@ -676,6 +781,7 @@ When generating Cadence code, apply these patterns:
 8. **Check for existing capabilities** before issuing
 9. **Store controllers** for revocable capabilities
 10. **Check storage paths** before saving
+11. **Write descriptive panic messages** with type, path, and interpolated values
 
 ## Reference Links
 

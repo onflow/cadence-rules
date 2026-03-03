@@ -90,6 +90,8 @@ access(all) fun setBalance(newBalance: UFix64) {
 - Mixed-access resources (both public and privileged functions)
 
 **Entitlement Declaration Pattern**:
+
+Entitlements should typically be a verb that describes what kind of actions the entitlement grants or a noun that describes the user that those entitled functions should be granted access to. The first letter of the entitlement should be capitalized.
 ```cadence
 // Define entitlements at contract level
 access(all) entitlement Admin
@@ -132,7 +134,7 @@ access(all) resource Vault {
     // Entitled withdraw (requires authorization)
     access(Withdraw) fun withdraw(amount: UFix64): @{FungibleToken.Vault} {
         pre {
-            self.balance >= amount: "Insufficient balance"
+            self.balance >= amount: "Insufficient balance: available \(self.balance), required \(amount)"
         }
         self.balance = self.balance - amount
         return <-create Vault(balance: amount)
@@ -148,20 +150,6 @@ access(all) resource Vault {
 **Separate Resources Pattern**
 
 When operations are clearly separated, consider using distinct resources:
-
-```cadence
-// Public interface resource
-access(all) resource VaultPublic {
-    access(all) view fun getBalance(): UFix64
-    access(all) fun deposit(from: @{FungibleToken.Vault})
-}
-
-// Private admin resource (stored separately)
-access(all) resource VaultAdmin {
-    access(all) fun withdraw(amount: UFix64): @{FungibleToken.Vault}
-    access(all) fun setBalance(newBalance: UFix64)
-}
-```
 
 ### Rule 5: Built-in Mutability Entitlements
 
@@ -212,7 +200,7 @@ access(Admin | Owner) fun privilegedAction() {
 
 ### ⚠️ Warning 1: Public Functions Are Completely Open
 
-Making a function `access(all)` means **anyone** can call it:
+Making a function `access(all)` means **anyone** can call it if it is at the top level of a contract or if it is on a resource that has a public capability published for it:
 
 ```cadence
 // ❌ CRITICAL SECURITY FLAW
@@ -253,20 +241,21 @@ access(all) resource User {
 
 ### ⚠️ Warning 3: Accidental Exposure in Capabilities
 
-When creating capabilities, only expose authorized reference types:
+When creating public capabilities, only expose un-authorized reference types:
 
 ```cadence
-// ❌ WRONG: Exposing full access
+// ❌ WRONG: Exposing entitled access
 let vaultCap = account.capabilities.storage
-    .issue<&Vault>(/storage/vault)  // Full access!
+    .issue<auth(Admin, Withdraw) &Vault>(/storage/vault)  // Full access!
 account.capabilities.publish(vaultCap, at: /public/vault)
 
-// ✅ CORRECT: Expose restricted reference
+// ✅ CORRECT: Expose a non-entitled reference
 let vaultCap = account.capabilities.storage
-    .issue<&{VaultPublic}>(/storage/vault)  // Only public interface
+    .issue<&Vault>(/storage/vault)  // Concrete type with no entitlements
 account.capabilities.publish(vaultCap, at: /public/vault)
 
-// ✅ ALSO CORRECT: Use entitled reference for privileged access
+// ✅ ALSO CORRECT: Use entitled reference for privileged access,
+// but DO NOT publish them!
 let adminCap = account.capabilities.storage
     .issue<auth(Admin, Withdraw) &Vault>(/storage/vault)
 // Store privately or give to trusted party
