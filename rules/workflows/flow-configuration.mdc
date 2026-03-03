@@ -478,7 +478,7 @@ config({
 
 #### Issue: "Cannot update contract"
 - Changes to `init()` or resource/struct fields require new contract version
-- Deploy as `MyContractV2.cdc` instead of using `--update`
+- Need to find another way to do the upgrade without adding new fields.
 
 ### FCL Frontend Issues
 
