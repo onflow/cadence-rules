@@ -1,0 +1,28 @@
+{
+  "repo": "cadence-rules",
+  "description": "Cursor Rules and .mdc files for Cadence on the Flow network. AI-assisted Cadence development that helps LLMs write safer Flow smart contracts",
+  "topics": [
+    "flow",
+    "cadence",
+    "cursor-rules",
+    "cursor",
+    "ai-development",
+    "vibe-coding",
+    "mdc",
+    "ai-tools",
+    "developer-tools",
+    "smart-contracts",
+    "ai-assisted-development",
+    "llm"
+  ],
+  "h1_suggestion": "# cadence-rules \u2014 Cursor Rules and AI Development Rules for Cadence",
+  "homepage_url": null,
+  "deprecated_urls": [],
+  "brand_voice_fixes": [
+    {
+      "find": "Flow blockchain",
+      "replace": "the Flow network"
+    }
+  ],
+  "audit_file": "cadence-rules-audit-2026-04-20.md"
+}
