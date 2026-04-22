@@ -1,10 +1,10 @@
-# Cadence Rules
+# cadence-rules — Cursor Rules and AI Development Rules for Cadence
 
-A comprehensive set of Cursor rules for building on the Flow blockchain with Cadence smart contracts and FCL frontend integration.
+A comprehensive set of Cursor rules for building on the Flow network with Cadence smart contracts and FCL frontend integration.
 
 ## Overview
 
-This repository provides AI-friendly documentation for Flow blockchain development, organized into two layers:
+This repository provides AI-friendly documentation for the Flow network development, organized into two layers:
 
 ### Root-Level Guides (Quick Reference)
 | File | Purpose |
@@ -148,4 +148,12 @@ cadence-rules/
         └── ... (10 more)
 ```
 
-The rules automatically guide AI responses to match Flow best practices and prevent common development pitfalls. 
+The rules automatically guide AI responses to match Flow best practices and prevent common development pitfalls.
+## About Flow
+
+This repo is part of the [Flow network](https://flow.com), a Layer 1 blockchain built for consumer applications, AI agents, and DeFi at scale.
+
+- Developer docs: https://developers.flow.com
+- Cadence language: https://cadence-lang.org
+- Community: [Flow Discord](https://discord.gg/flow) · [Flow Forum](https://forum.flow.com)
+- Governance: [Flow Improvement Proposals](https://github.com/onflow/flips)
