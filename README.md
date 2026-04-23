@@ -6,12 +6,12 @@ A comprehensive set of Cursor rules for building on the Flow network with Cadenc
 
 This repository provides AI-friendly documentation for the Flow network development, organized into two layers:
 
-### Root-Level Guides (Quick Reference)
+### Key Guides (Quick Reference)
 | File | Purpose |
 |------|---------|
-| [cadence-nft-standards.mdc](./cadence-nft-standards.mdc) | NFT-specific patterns, MetadataViews integration, modular architecture for complex traits |
-| [flow-configuration.mdc](./flow-configuration.mdc) | Complete `flow.json` & FCL setup guide covering configuration, deployment, and network management |
-| [flow-development-workflow.mdc](./flow-development-workflow.mdc) | Development lifecycle, debugging methodology, gas optimization, testnet validation |
+| [cadence-nft-standards.mdc](./rules/cadence/cadence-nft-standards.mdc) | NFT-specific patterns, MetadataViews integration, modular architecture for complex traits |
+| [flow-configuration.mdc](./rules/workflows/flow-configuration.mdc) | Complete `flow.json` & FCL setup guide covering configuration, deployment, and network management |
+| [flow-development-workflow.mdc](./rules/workflows/flow-development-workflow.mdc) | Development lifecycle, debugging methodology, gas optimization, testnet validation |
 | [user-preferences.mdc](./user-preferences.mdc) | Communication style and development philosophy preferences (alwaysApply: true) |
 
 ### Detailed Rules Library
@@ -114,10 +114,10 @@ Environment-based setup for:
 # Initialize Flow project
 flow init
 
-# Reference root guides for quick help
-# - cadence-nft-standards.mdc for NFT development
-# - flow-configuration.mdc for setup and deployment
-# - flow-development-workflow.mdc for debugging and optimization
+# Reference key guides for quick help
+# - rules/cadence/cadence-nft-standards.mdc for NFT development
+# - rules/workflows/flow-configuration.mdc for setup and deployment
+# - rules/workflows/flow-development-workflow.mdc for debugging and optimization
 
 # Explore detailed rules for comprehensive coverage
 # - rules/cadence/ for language fundamentals
@@ -129,18 +129,19 @@ flow init
 ```
 cadence-rules/
 ├── README.md
-├── cadence-nft-standards.mdc          # NFT-specific patterns
-├── flow-configuration.mdc             # Setup & deployment guide
-├── flow-development-workflow.mdc      # Development lifecycle
-├── user-preferences.mdc               # AI behavior preferences
+├── user-preferences.mdc               # AI behavior preferences (applied globally)
 └── rules/
     ├── cadence/                       # 13 comprehensive Cadence rules
+    │   ├── cadence-nft-standards.mdc  # NFT-specific patterns
     │   ├── index.md                   # Navigation hub
     │   ├── access-control-and-entitlements.md
     │   ├── capabilities-and-security.md
     │   ├── resources.md
     │   ├── transactions.md
     │   └── ... (9 more)
+    ├── workflows/                     # Development workflow rules
+    │   ├── flow-configuration.mdc     # Setup & deployment guide
+    │   └── flow-development-workflow.mdc # Development lifecycle
     └── defi-actions/                  # DeFi integration patterns
         ├── index.md                   # Quick links
         ├── core-framework.md
@@ -149,6 +150,7 @@ cadence-rules/
 ```
 
 The rules automatically guide AI responses to match Flow best practices and prevent common development pitfalls.
+
 ## About Flow
 
 This repo is part of the [Flow network](https://flow.com), a Layer 1 blockchain built for consumer applications, AI agents, and DeFi at scale.
